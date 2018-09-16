@@ -1,0 +1,25 @@
+# swoole-source-analysis
+
+## 阅读顺序
+
+- [Swoole 源码分析——内存模块之内存池](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——内存模块之内存池.md)
+- [Swoole 源码分析——内存模块之共享内存](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——内存模块之共享内存.md)
+- [Swoole 源码分析——内存模块之共享内存表](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——内存模块之共享内存表.md)
+- [Swoole 源码分析——内存模块之 swBuffer](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——内存模块之swBuffer.md)
+- [Swoole 源码分析——基础模块之 HashMap](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——基础模块之HashMap.md)
+- [Swoole 源码分析——基础模块之锁与信号 ](https://github.com/LeoYang90/swoole-source-analysis/edit/master/Swoole%20源码分析——锁与信号模块.md)
+- [Swoole 源码分析——Reactor 模块之 ReactorBase](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——Reactor模块之ReactorBase.md)
+- [Swoole 源码分析——Reactor 模块之 ReactorEpoll](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——Reactor%20模块之%20ReactorEpoll.md)
+- [Swoole 源码分析——Server 模块之初始化](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——Server模块之construct.md)
+- [Swoole 源码分析——Server 模块之 Start](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——Server模块之Start.md)
+- [Swoole 源码分析——Server 模块之 ReactorThread 事件循环（上）](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——Server模块之ReactorThread事件循环.md)
+- [Swoole 源码分析——Server 模块之 ReactorThread 事件循环（下）](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——Server模块之ReactorThread事件循环（下）.md)
+- [Swoole 源码分析——Server 模块之 Worker 事件循环](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——Server模块之Worker事件循环.md)
+- [Swoole 源码分析——Server 模块之 Stream 模式](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——Server模块之Stream%20模式.md)
+- [Swoole 源码分析——Server 模块之 TaskWorker 事件循环](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——Server模块之TaskWorker事件循环.md)
+- [Swoole 源码分析——Server 模块之 Timer 模块与时间轮](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——Server模块之Timer模块.md)
+- [Swoole 源码分析——Server 模块之 Signal 信号处理](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——Server模块之Signal信号处理.md)
+- [Swoole 源码分析——基础模块之 Queue 队列](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——基础模块之%20Queue%20队列.md)
+- [Swoole 源码分析——基础模块之 Heap 堆](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——基础模块之%20Heap%20堆.md)
+- [Swoole 源码分析——基础模块之 Channel 队列](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——基础模块之%20Channel.md)
+- [Swoole 源码分析——基础模块之 Pipe 管道](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——基础模块之%20Pipe%20管道.md)
