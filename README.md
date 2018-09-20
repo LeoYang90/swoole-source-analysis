@@ -23,3 +23,4 @@
 - [Swoole 源码分析——基础模块之 Heap 堆](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——基础模块之%20Heap%20堆.md)
 - [Swoole 源码分析——基础模块之 Channel 队列](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——基础模块之%20Channel.md)
 - [Swoole 源码分析——基础模块之 Pipe 管道](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20源码分析——基础模块之%20Pipe%20管道.md)
+- [Swoole 源码分析——Server模块之OpenSSL(上)](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94Server%E6%A8%A1%E5%9D%97%E4%B9%8BOpenSSL(%E4%B8%8A).md)
