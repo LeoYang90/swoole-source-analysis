@@ -8,7 +8,7 @@
 
 `heap` 中 `num` 是现有数据堆的数量，`size` 是数据堆的大小，`type` 用于确定数据堆是最大堆还是最小堆，`nodes` 是数据堆的节点。`swHeap_node` 中 `priority` 是数据堆的权重，也是数据堆排序的依据，`position` 是其在数据堆中的位置。
 
-```
+```c
 typedef struct swHeap_node
 {
     uint64_t priority;
@@ -36,7 +36,7 @@ typedef struct _swHeap
 
 创建一个数据堆就是初始化 `swHeap` 的各个属性。
 
-```
+```c
 swHeap *swHeap_new(size_t n, uint8_t type)
 {
     swHeap *heap = sw_malloc(sizeof(swHeap));
@@ -64,7 +64,7 @@ swHeap *swHeap_new(size_t n, uint8_t type)
 
 `swHeap_bubble_up` 函数负责将数据节点提升到数据堆中相应的位置。方法很简单，新的数据节点不断的和父节点进行对比，符合条件就进行替换，不符合条件就停止，结束。
 
-```
+```c
 swHeap_node* swHeap_push(swHeap *heap, uint64_t priority, void *data)
 {
     void *tmp;
@@ -135,7 +135,7 @@ static sw_inline int swHeap_compare(uint8_t type, uint64_t a, uint64_t b)
 改变了数据节点的权重之后，需要重新进行堆排序，将数据节点向上提升，或者将数据向下调整。向下调整方法也很简单，不断的和两个子节点进行比较，调整该数据节点和子节点的顺序。
 
 
-```
+```c
 void swHeap_change_priority(swHeap *heap, uint64_t new_priority, void* ptr)
 {
     swHeap_node *node = ptr;
@@ -191,7 +191,7 @@ static uint32_t swHeap_maxchild(swHeap *heap, uint32_t i)
 
 弹出堆顶元素后，需要重新调整整个数据堆。方法是将尾部元素和堆顶元素进行交换，然后再对堆顶元素进行排序。
 
-```
+```c
 void *swHeap_pop(swHeap *heap)
 {
     swHeap_node *head;
@@ -217,7 +217,7 @@ void *swHeap_pop(swHeap *heap)
 删除堆节点元素和弹出堆顶元素类似，都是先将该元素和尾部元素进行替换，然后再对其进行排序。由于尾部元素不一定比待删除的元素权重高，因此需要先判断其权重，再决定是提升还是降低。
 
 
-```
+```c
 int swHeap_remove(swHeap *heap, swHeap_node *node)
 {
     uint32_t pos = node->position;

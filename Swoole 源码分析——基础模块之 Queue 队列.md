@@ -11,7 +11,7 @@
 
 `swMsgQueue` 的数据结构比较简单，`blocking` 指定消息队列是否是阻塞式，`msg_id` 是创建的消息队列的 `id`，`flags` 也是指定阻塞式还是非阻塞式，`perms` 指定消息队列的权限。
 
-```
+```c
 typedef struct _swMsgQueue
 {
     int blocking;
@@ -28,7 +28,7 @@ typedef struct _swMsgQueue
 
 创建消息队列就是调用 `msgget` 函数，这个函数的 `msg_key` 就是 `server` 端配置的 `message_queue_key`，`task` 队列在 `server` 结束后不会销毁，重新启动程序后，`task` 进程仍然会接着处理队列中的任务。如果不设置该值，那么程序会自动生成： `ftok($php_script_file, 1)`
 
-```
+```c
 void swMsgQueue_set_blocking(swMsgQueue *q, uint8_t blocking)
 {
     if (blocking == 0)
@@ -71,7 +71,7 @@ int swMsgQueue_create(swMsgQueue *q, int blocking, key_t msg_key, int perms)
 
 消息队列的发送主要利用 `msgsnd` 函数，`flags` 指定发送是阻塞式还是非阻塞式，在 `task_worker` 进程中都是采用阻塞式发送的方法。
 
-```
+```c
 int swMsgQueue_push(swMsgQueue *q, swQueue_data *in, int length)
 {
     int ret;
@@ -113,7 +113,7 @@ int swMsgQueue_push(swMsgQueue *q, swQueue_data *in, int length)
 
 `task_worker` 进程的主循环会阻塞在本函数中，直到有消息到达。
 
-```
+```c
 int swMsgQueue_pop(swMsgQueue *q, swQueue_data *data, int length)
 {
     int ret = msgrcv(q->msg_id, data, length, data->mtype, q->flags);
@@ -140,7 +140,7 @@ int swMsgQueue_pop(swMsgQueue *q, swQueue_data *data, int length)
 
 值得注意的是数据结构中的 `flags`，该值只会是 0-4 中的一个，该值都是利用原子锁来改动，以此来实现互斥的作用。
 
-```
+```c
 typedef struct _swRingQueue
 {
 	void **data; /* 队列空间 */
@@ -162,7 +162,7 @@ typedef struct _swRingQueue
 
 环形队列的创建很简单，就是初始化队列数据结构中的各种属性。
 
-```
+```c
 int swRingQueue_init(swRingQueue *queue, int buffer_size)
 {
     queue->size = buffer_size;
@@ -193,7 +193,7 @@ int swRingQueue_init(swRingQueue *queue, int buffer_size)
 
 最后，将 `cur_tail_flag_index` 原子加 1，将队列元素状态改为待读；将 `queue->num` 原子加 1
 
-```
+```c
 int swRingQueue_push(swRingQueue *queue, void * ele)
 {
     if (!(queue->num < queue->size))
@@ -235,7 +235,7 @@ int swRingQueue_push(swRingQueue *queue, void * ele)
 获取到队首元素之后，要立刻更新队首的新位置，然后将数据的首地址传递给 `ele`，然后将队首元素状态复原，减少队列的 `num`。
 
 
-```
+```c
 int swRingQueue_pop(swRingQueue *queue, void **ele)
 {
     if (!(queue->num > 0))

@@ -4,7 +4,7 @@
 
 `task_worker` 进程的创建可以分为三个步骤：`swServer_create_task_worker` 申请所需的内存、`swTaskWorker_init` 初始化各个属性、`swProcessPool_start` 创建进程
 
-```
+```c
 int swManager_start(swFactory *factory)
 {
     swFactoryProcess *object = factory->object;
@@ -69,7 +69,7 @@ int swManager_start(swFactory *factory)
 - 不同于 `worker` 进程，`tasker` 进程由 `swProcessPool_create` 创建
 - 如果是 `stream` 模式，程序还要调用 `swProcessPool_create_unix_socket` 创建一个监听的 `socket`
 
-```
+```c
 int swServer_create_task_worker(swServer *serv)
 {
     key_t key = 0;
@@ -117,7 +117,7 @@ int swServer_create_task_worker(swServer *serv)
 - 创建 `pool->map` 与 `main_loop`
 
 
-```
+```c
 int swProcessPool_create(swProcessPool *pool, int worker_num, int max_request, key_t msgqueue_key, int ipc_mode)
 {
     bzero(pool, sizeof(swProcessPool));
@@ -211,7 +211,7 @@ int swProcessPool_create(swProcessPool *pool, int worker_num, int max_request, k
 当调度模式是 `stream` 的时候，还有创建相应的本地 `UNIX` 域套接字 `socket`，绑定到 `/tmp/swoole.task.%d.sock` 本地 `sock` 文件上。
 
 
-```
+```c
 int swProcessPool_create_unix_socket(swProcessPool *pool, char *socket_file, int blacklog)
 {
     if (pool->ipc_mode != SW_IPC_SOCKET)
@@ -258,7 +258,7 @@ int swSocket_create_server(int type, char *address, int port, int backlog)
 
 ## `swTaskWorker_init` 函数
 
-```
+```c
 void swTaskWorker_init(swProcessPool *pool)
 {
     swServer *serv = SwooleG.serv;
@@ -285,7 +285,7 @@ void swTaskWorker_init(swProcessPool *pool)
 - `fork` 子进程后，将 `task` 进程的进程 `id` 存放到 `pool->map` 中
 - 在 `task` 进程中，调用 `onWorkerStart` 回调函数、`onWorkerStop` 回调函数，进行事件循环
 
-```
+```c
 int swProcessPool_start(swProcessPool *pool)
 {
     if (pool->ipc_mode == SW_IPC_SOCKET && (pool->stream == NULL || pool->stream->socket == 0))
@@ -368,7 +368,7 @@ pid_t swProcessPool_spawn(swProcessPool *pool, swWorker *worker)
 
 `onWorkerStart` 函数是进程启动的回调函数，作用是设置信号处理函数，调用设置的 `serv->onWorkerStart` 函数。
 
-```
+```c
 void swTaskWorker_onStart(swProcessPool *pool, int worker_id)
 {
     swServer *serv = pool->ptr;
@@ -408,7 +408,7 @@ static void swTaskWorker_signal_init(void)
 
 ### `onWorkerStop` 函数
 
-```
+```c
 void swTaskWorker_onStop(swProcessPool *pool, int worker_id)
 {
     swServer *serv = pool->ptr;
@@ -426,7 +426,7 @@ void swTaskWorker_onStop(swProcessPool *pool, int worker_id)
 - 消费消息之后，向 `stream` 中发送空数据，告知 `worker` 进程已消费，并且关闭新连接。
 
 
-```
+```c
 static int swProcessPool_worker_loop(swProcessPool *pool, swWorker *worker)
 {
     struct
@@ -575,7 +575,7 @@ static int swProcessPool_worker_loop(swProcessPool *pool, swWorker *worker)
 - 调用 `swWorker_send2worker` 发送数据给其他 `worker` 进程
 
 
-```
+```c
 PHP_METHOD(swoole_server, sendMessage)
 {
     swEventData buf;
@@ -612,7 +612,7 @@ PHP_METHOD(swoole_server, sendMessage)
 - 如果数据过大，那么调用 `swTaskWorker_large_pack` 将消息写入临时文件；否则赋值给 `task->data`
 
 
-```
+```c
 #define swTask_type(task)                  ((task)->info.from_fd)
 
 int php_swoole_task_pack(swEventData *task, zval *data TSRMLS_DC)
@@ -732,7 +732,7 @@ int swTaskWorker_large_pack(swEventData *task, void *data, int data_len)
 `swWorker_send2worker` 函数负责向 `task` 进程发送消息。可以看到 `sendMessage` 函数并不支持 `stream` 模式。
 
 
-```
+```c
 int swWorker_send2worker(swWorker *dst_worker, void *buf, int n, int flag)
 {
     int pipefd, ret;
@@ -783,7 +783,7 @@ int swWorker_send2worker(swWorker *dst_worker, void *buf, int n, int flag)
 - 利用 `buf.info.fd` 将 `onFinish` 异步回调函数保存到 `task_callbacks` 中
 - 使用 `swProcessPool_dispatch` 将消息传递给 `task` 进程
 
-```
+```c
 PHP_METHOD(swoole_server, task)
 {
     swEventData buf;
@@ -844,7 +844,7 @@ PHP_METHOD(swoole_server, task)
 - 调用 `swWorker_send2worker` 发送数据给 `worker` 进程。
 
 
-```
+```c
 int swProcessPool_dispatch(swProcessPool *pool, swEventData *data, int *dst_worker_id)
 {
     int ret = 0;
@@ -916,7 +916,7 @@ static sw_inline int swProcessPool_schedule(swProcessPool *pool)
 
 `taskWait` 函数是同步投递任务的函数，该函数利用 `swProcessPool_dispatch_blocking` 投递任务之后，会不断读取 `serv->task_notify`，知道获取返回的数据。
 
-```
+```c
 PHP_METHOD(swoole_server, taskwait)
 {
     swEventData buf;
@@ -976,7 +976,7 @@ PHP_METHOD(swoole_server, taskwait)
 
 `swProcessPool_dispatch_blocking` 函数与 `swProcessPool_dispatch` 函数唯一的不同在于调用 `swWorker_send2worker` 的时候并没有使用 `SW_PIPE_NONBLOCK` 选项。
 
-```
+```c
 int swProcessPool_dispatch_blocking(swProcessPool *pool, swEventData *data, int *dst_worker_id)
 {
     int ret = 0;
@@ -1026,7 +1026,7 @@ int swProcessPool_dispatch_blocking(swProcessPool *pool, swEventData *data, int 
 
 ### `php_swoole_task_unpack` 函数
 
-```
+```c
 zval* php_swoole_task_unpack(swEventData *task_result TSRMLS_DC)
 {
     zval *result_data, *result_unserialized_data;
@@ -1140,7 +1140,7 @@ static sw_inline swString* swTaskWorker_large_unpack(swEventData *task_result)
 - 读取临时文件内容，并解析文件中各个任务的返回值
 
 
-```
+```c
 #define SW_TASK_TMP_FILE                 "/tmp/swoole.task.XXXXXX"
 
 PHP_METHOD(swoole_server, taskWaitMulti)
@@ -1278,7 +1278,7 @@ PHP_METHOD(swoole_server, taskWaitMulti)
 - `task` 进程接受到消息之后，要判断消息来源于 `sendMessage` 还是 `SW_TASK_CALLBACK`
 
 
-```
+```c
 int swTaskWorker_onTask(swProcessPool *pool, swEventData *task)
 {
     int ret = SW_OK;
@@ -1303,7 +1303,7 @@ int swTaskWorker_onTask(swProcessPool *pool, swEventData *task)
 `php_swoole_onPipeMessage` 函数就是 `serv->onPipeMessage(serv, task)` 函数，该函数主要功能就是调用回调函数 `onPipeMessage`
 
 
-```
+```c
 static void php_swoole_onPipeMessage(swServer *serv, swEventData *req)
 {
     SWOOLE_GET_TSRMLS;
@@ -1338,7 +1338,7 @@ static void php_swoole_onPipeMessage(swServer *serv, swEventData *req)
 本函数就是 `serv->onTask(serv, task)` 所调用的函数，该函数最重要的功能是调用 `onTask` 回调函数，回调函数结束之后调用 `php_swoole_task_finish` 函数向 `worker` 进程发送已结束信息。
 
 
-```
+```c
 static int php_swoole_onTask(swServer *serv, swEventData *req)
 {
     zval *zserv = (zval *) serv->ptr2;
@@ -1402,7 +1402,7 @@ static int php_swoole_onTask(swServer *serv, swEventData *req)
 
 `php_swoole_task_finish` 函数主要用于告知 `worker` 进程投递的任务已完成。首先需要序列化参数，然后调用 `swTaskWorker_finish` 函数发送消息。
 
-```
+```c
 static int php_swoole_task_finish(swServer *serv, zval *data TSRMLS_DC)
 {
     int flags = 0;
@@ -1472,7 +1472,7 @@ static int php_swoole_task_finish(swServer *serv, zval *data TSRMLS_DC)
 - 如果使用的是 `taskWait` 同步投递任务的话，将数据放入 `serv->task_result` 中，或者放入 `SwooleG.task_tmpdir` 指定的临时文件中。向 `serv->task_notify` 发送消息，告知 `worker` 进行 `task` 已消费完毕。
 
 
-```
+```c
 int swTaskWorker_finish(swServer *serv, char *data, int data_len, int flags)
 {
     swEventData buf;
@@ -1650,7 +1650,7 @@ int swTaskWorker_finish(swServer *serv, char *data, int data_len, int flags)
 - 我们可以看到，`worker` 函数会调用 `serv->onFinish` 函数，也就是 `php_swoole_onFinish` 函数。
 - `php_swoole_onFinish` 函数主要用于调用 `onFinish` 回调函数。`onFinish` 回调函数有些是 `swoole_server->task` 函数指定，存储在 `task_callbacks` 中；有些是 `swoole_server->onFinish` 指定，存储在 `php_sw_server_callbacks[SW_SERVER_CB_onFinish]` 中。
 
-```
+```c
 int swWorker_onTask(swFactory *factory, swEventData *task)
 {
     ...

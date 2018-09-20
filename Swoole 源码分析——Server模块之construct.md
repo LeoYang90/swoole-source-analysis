@@ -16,7 +16,7 @@
 
 构造 `server` 对象最重要的是两件事：`swServer_init` 初始化 `server`、为 `server` 添加端口：
 
-```
+```c
 PHP_METHOD(swoole_server, __construct)
 {
     zend_size_t host_len = 0;
@@ -53,7 +53,7 @@ PHP_METHOD(swoole_server, __construct)
 - `swServer_init` 函数主要为 `serv` 对象赋值初值，如果想要更改 `serv` 对象各个属性，可以调用 `set` 函数
 - `serv->gs` 是全局共享内存
 
-```
+```c
 void swServer_init(swServer *serv)
 {
     swoole_init();
@@ -109,7 +109,7 @@ void swServer_init(swServer *serv)
 - `SwooleGS` 是全局的共享内存
 - `SwooleTG` 是线程特有数据，每个线程都有自己独特的数据
 
-```
+```c
 extern swServerG SwooleG;              //Local Global Variable
 extern SwooleGS_t *SwooleGS;           //Share Memory Global Variable
 extern __thread swThreadG SwooleTG;   //Thread Global Variable
@@ -236,7 +236,7 @@ void swoole_init(void)
 - 根据协议类型设置 `have_udp_sock`、`have_tcp_sock`、`udp_socket_ipv4/udp_socket_ipv6` 等等属性
 - 递增 `listen_port_num` ，向单链表 `listen_list` 中添加 `swListenPort` 对象
 
-```
+```c
 enum swSocket_type
 {
     SW_SOCK_TCP          =  1,
@@ -349,7 +349,7 @@ swListenPort* swServer_add_port(swServer *serv, int type, char *host, int port)
 - `backlog`、`tcp_keepcount`、`tcp_keepidle` 等等都是相应 `socket` 的属性
 - 在外网通信时，有些客户端发送数据的速度较慢，每次只能发送一小段数据。这样 `onReceive` 到的数据就不是一个完整的包。 还有些客户端是逐字节发送数据的，如果每次回调 `onReceive` 会拖慢整个系统。[Length_Check 和 EOF_Check 的使用](https://wiki.swoole.com/wiki/page/57.html)。`package_length_type`、`package_eof` 等等就是相关参数的具体参数。
 
-```
+```c
 #define SW_DATA_EOF                "\r\n\r\n"
 
 void swPort_init(swListenPort *port)
@@ -394,7 +394,7 @@ void swPort_init(swListenPort *port)
 
 `swSocket_create` 函数会根据 `type` 的类型来调用 `socket` 系统调用
 
-```
+```c
 int swSocket_create(int type)
 {
     int _domain;
@@ -446,7 +446,7 @@ int swSocket_create(int type)
 - 对于 `IPV4`，需要设置 `sin_family`、`sin_port`、`sin_addr`;对于 `IPV6`，需要设置 `sin6_family`、`sin6_port`、`sin6_addr`，然后调用 `bind` 函数;
 - 如果 `port` 为0，说明服务器绑定的是任意端口，`bind` 函数会将系统所选择的端口返回给 `sockaddr` 对象
 
-```
+```c
 int swSocket_bind(int sock, int type, char *host, int *port)
 {
     int ret;
@@ -532,7 +532,7 @@ int swSocket_bind(int sock, int type, char *host, int *port)
 
 - 此函数主要是利用 `fcntl` 函数为文件描述符设置阻塞/非阻塞、`CLOEXEC` 等属性。
 
-```
+```c
 void swoole_fcntl_set_option(int sock, int nonblock, int cloexec)
 {
     int opts, ret;

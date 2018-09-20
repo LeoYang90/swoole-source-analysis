@@ -5,7 +5,7 @@
 - 在 `linux` 中，最为高效的 `reactor` 机制就是 `epoll`。`swReactor` 的 `object` 会存储 `epoll` 的对象 `swReactorEpoll_s`。该数据结构中 `epfd` 是 `epoll` 的 `id`，`events` 用于在 `epoll_wait` 函数接受就绪的事件。
 - 该函数最重要的是 `epoll_create`，该函数会创建 `epoll` 对象
 
-```
+```c
 typedef struct swReactorEpoll_s swReactorEpoll;
 
 struct swReactorEpoll_s
@@ -59,7 +59,7 @@ int swReactorEpoll_create(swReactor *reactor, int max_event_num)
 
 - `swReactorEpoll_event_set` 函数用于转化可读(`SW_EVENT_READ`)、可写(`SW_EVENT_WRITE `)的状态为 `epoll` 函数可用的 `EPOLLIN`、`EPOLLOUT`、`EPOLLERR`
 
-```
+```c
 static sw_inline int swReactorEpoll_event_set(int fdtype)
 {
     uint32_t flag = 0;
@@ -84,7 +84,7 @@ static sw_inline int swReactorEpoll_event_set(int fdtype)
 - `swReactor_add` 函数用于更新 `reactor->socket_list` 的 `fdtype` 与 `events`
 - 最后需要自增 `event_num` 的数值
 
-```
+```c
 typedef struct _swFd
 {
     uint32_t fd;
@@ -132,7 +132,7 @@ static sw_inline void swReactor_add(swReactor *reactor, int fd, int type)
 
 - 修改监听主要调用 `epoll_ctl` 的 `EPOLL_CTL_MOD` 命令
 
-```
+```c
 static int swReactorEpoll_set(swReactor *reactor, int fd, int fdtype)
 {
     swReactorEpoll *object = reactor->object;
@@ -170,7 +170,7 @@ static int swReactorEpoll_set(swReactor *reactor, int fd, int fdtype)
 - 修改监听主要调用 `epoll_ctl` 的 `EPOLL_CTL_DEL` 命令
 - 最后需要更新 `event_num`
 
-```
+```c
 static int swReactorEpoll_del(swReactor *reactor, int fd)
 {
     swReactorEpoll *object = reactor->object;
@@ -201,7 +201,7 @@ static int swReactorEpoll_del(swReactor *reactor, int fd)
 - 事件循环的最后调用 `onFinish` 函数
 - 如果设置了 `once`，说明此 `reactor` 只会循环一次，立即退出；否则，继续事件循环
 
-```
+```c
 typedef struct _swEvent
 {
     int fd;

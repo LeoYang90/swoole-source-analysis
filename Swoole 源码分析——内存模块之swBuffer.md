@@ -9,7 +9,7 @@
 - `swBuffer` 数据结构中 `trunk_num` 是链表元素的个数，`trunk_size` 是 `swBuffer` 缓冲区创建时，链表元素约定的大小(实际大小不一定是这个值)，`length` 是实际上缓冲区占用的内存总大小。
 - `swBuffer_trunk` 中的 `type` 有三种，分别应用于：缓存数据、发送文件、提醒连接关闭三种情景。`length` 指的是元素的内存大小。
 
-```
+```c
 enum swBufferChunk
 {
     SW_CHUNK_DATA,
@@ -52,7 +52,7 @@ typedef struct _swBuffer
 
 `swBuffer` 的创建很简单，只是初始化整个 `swBuffer` 的 `header` 头元素而已：
 
-```
+```c
 swBuffer* swBuffer_new(int trunk_size)
 {
     swBuffer *buffer = sw_malloc(sizeof(swBuffer));
@@ -74,7 +74,7 @@ swBuffer* swBuffer_new(int trunk_size)
 
 `swBuffer` 内存的申请逻辑也很简单，按照传入的 `size` 参数为链表元素申请内存，初始化成员变量，然后将链表元素放到链表的尾部即可：
 
-```
+```c
 int swBuffer_append(swBuffer *buffer, void *data, uint32_t size)
 {
     swBuffer_trunk *chunk = swBuffer_new_trunk(buffer, SW_CHUNK_DATA, size);
@@ -140,7 +140,7 @@ swBuffer_trunk *swBuffer_new_trunk(swBuffer *buffer, uint32_t type, uint32_t siz
 
 从 `swBuffer` 缓冲区拿数据只能从 `head` 中获取：
 
-```
+```c
 #define swBuffer_get_trunk(buffer)   (buffer->head)
 
 ``` 
@@ -150,7 +150,7 @@ swBuffer_trunk *swBuffer_new_trunk(swBuffer *buffer, uint32_t type, uint32_t siz
 获取了缓冲区的元素之后，就要相应删除 `head` 链表元素:
 
 
-```
+```c
 void swBuffer_pop_trunk(swBuffer *buffer, swBuffer_trunk *chunk)
 {
     if (chunk->next == NULL)
@@ -181,7 +181,7 @@ void swBuffer_pop_trunk(swBuffer *buffer, swBuffer_trunk *chunk)
 
 ## `swBuffer` 缓冲区的销毁
 
-```
+```c
 int swBuffer_free(swBuffer *buffer)
 {
     volatile swBuffer_trunk *chunk = buffer->head;

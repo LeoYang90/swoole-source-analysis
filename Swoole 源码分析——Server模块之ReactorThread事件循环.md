@@ -16,7 +16,7 @@
 - 根据 `new_fd` 分配其该处理的 `reactor` 线程，并向该 `reactor` 线程添加该文件描述符的监控，但是值得注意的是，这时只会监听写事件，用于向客户端说明已接收 `accept` 请求，并不会监听读事件
 - `swServer_connection_new` 函数用于更新 `serv->connection_list[new_fd]` 的属性
 
-```
+```c
 int swServer_master_onAccept(swReactor *reactor, swEvent *event)
 {
     swServer *serv = reactor->ptr;
@@ -130,7 +130,7 @@ int swServer_master_onAccept(swReactor *reactor, swEvent *event)
 - 设置 `swConnection` 的 `fd`、`from_id`、`from_fd`、`connect_time`、`last_time` 等等参数
 - 设置连接的 `session_id`
 
-```
+```c
 static swConnection* swServer_connection_new(swServer *serv, swListenPort *ls, int fd, int from_fd, int reactor_id)
 {
     swConnection* connection = NULL;
@@ -241,7 +241,7 @@ static swConnection* swServer_connection_new(swServer *serv, swListenPort *ls, i
 - 遍历 `serv->workers`，找出与当前 `reactor` 相对应的的 `worker`，添加 `pipe_master` 文件描述符到 `reactor` 进行监控，设置其 `serv->connection_list[pipe_master]` 的 `in_buffer`、`from_id`、`object`，当前线程的 `notify_pipe`、`pipe_read_list`
 - 如果开启了时间轮算法，就要创建 `reactor->timewheel` 对象，计算 `reactor->heartbeat_interval`，替代原有的 `onFinish`、`onTimeout` 回调函数。
 
-```
+```c
 static int swReactorThread_loop(swThreadParam *param)
 {
     swServer *serv = SwooleG.serv;
@@ -500,7 +500,7 @@ void swReactorThread_set_protocol(swServer *serv, swReactor *reactor)
 - 如果 	`out_buffer` 为空，那么重新设置 `socket` 文件描述符的 `reactor` 监听事件，删除写就绪，只设置读就绪。这个是水平触发模式的必要步骤，避免无数据写入时，频繁地调用写就绪回调函数。
 
 
-```
+```c
 static int swReactorThread_onWrite(swReactor *reactor, swEvent *ev)
 {
     int ret;
@@ -646,7 +646,7 @@ static int swReactorThread_onWrite(swReactor *reactor, swEvent *ev)
 
 无论是哪种情况，发送数据后都会立刻返回结果，不会阻塞导致 `reactor` 线程事件循环停滞。
 
-```
+```c
 int swConnection_buffer_send(swConnection *conn)
 {
     int ret, sendn;
@@ -701,7 +701,7 @@ int swConnection_buffer_send(swConnection *conn)
 - 更新 `last_time`、`last_time_usec`
 - 调用 `port->onRead` 函数。值得注意的是，这个 `onRead` 函数，是在 `reactor` 线程启动时，调用 `swPort_set_protocol` 这个函数设置的。`open_length_check`、`open_length_check` 等等不同的设置，`onRead` 也会不同。
 
-```
+```c
 static int swReactorThread_onRead(swReactor *reactor, swEvent *event)
 {
     swServer *serv = reactor->ptr;
@@ -747,7 +747,7 @@ static int swReactorThread_onRead(swReactor *reactor, swEvent *event)
 - 如果开启了 `open_length_check` 选项，包长检测提供了固定包头+包体这种格式协议的解析。启用后，可以保证Worker进程onReceive每次都会收到一个完整的数据包。这个时候 `onRead` 函数就是 `swPort_onRead_check_length`
 - 如果没有设置任何选项，那么发送给 `worker` 的数据包并不保证是完整的，需要用户自己去拼装。此时 `onRead` 函数就是 `swPort_onRead_raw`
 
-```
+```c
 void swPort_set_protocol(swListenPort *ls)
 {
     //Thread mode must copy the data.
@@ -816,7 +816,7 @@ void swPort_set_protocol(swListenPort *ls)
 	- 接受到数据
 - 接受到数据之后，就要调用 `swReactorThread_dispatch` 函数将数据发送给相应的 `worker`，`task.target_worker_id` 被初始化为 -1。
 
-```
+```c
 static int swPort_onRead_raw(swReactor *reactor, swListenPort *port, swEvent *event)
 {
     int n;
@@ -870,7 +870,7 @@ static int swPort_onRead_raw(swReactor *reactor, swListenPort *port, swEvent *ev
 - `RINGBUFFER` 共享内存池解决了大包发送的问题，数据包大小将不受限制，一次 `IPC` 就可以投递整个数据包，再也不需要拆包，然后多次调用 `send` 系统调用。
 	- `RINGBUFFER` 共享内存池需要调用 `swReactorThread_alloc` 函数从 `reactor->buffer_input` 中申请内存，将数据复制到共享内存中后，将共享内存的首地址存储到 `swPackage` 对象中，再将 `swPackage` 对象打包到 `swDispatchData` 对象中。这样，`worker` 进程和 `reactor` 线程之间传递的仅仅是共享内存的首地址，无需真正传递大数据包，`worker` 进程得到首地址后只需要从共享内存中拷贝数据即可。	
 
-```
+```c
 enum swFactory_dispatch_mode
 {
     SW_DISPATCH_ROUND    = 1,
@@ -1041,7 +1041,7 @@ int swReactorThread_dispatch(swConnection *conn, char *data, uint32_t length)
 - 如果 `reactor` 线程处理完消息，`worker` 进程还没有释放共享内存，并且次数达到 `SW_RINGBUFFER_WARNING `,那么就需要 `sleep`
 - `pipe_read_list` 是绑定到本 `reactor` 线程的 `pipe_master` 列表，与 `reactor` 线程绑定的 `worker` 处理消息之后，会向这个 `pipe_master` 发送消息
 
-```
+```c
 static sw_inline void* swReactorThread_alloc(swReactorThread *thread, uint32_t size)
 {
     void *ptr = NULL;
@@ -1089,7 +1089,7 @@ static sw_inline void swReactorThread_yield(swReactorThread *thread)
 - 本函数主要调用 `swServer_worker_schedule` 函数来进行调度，决定应该向哪个 `worker` 进程发送数据。
 - `swReactorThread_send2worker` 函数用于发送数据
 
-```
+```c
 static sw_inline int swEventData_is_stream(uint8_t type)
 {
     switch (type)
@@ -1183,7 +1183,7 @@ static int swFactoryProcess_dispatch(swFactory *factory, swDispatchData *task)
 - 本函数根据 `dispatch_mode` 的不同，计算 `key` 值
 - 值得注意的时候 `抢占模式`，其方法就是遍历 `worker`，获取 `worker` 进程的当前状态，找到 `SW_WORKER_IDLE` 空闲的 `worker` 进程。如果所有 `worker` 进程都是繁忙的，那么就退化为了 `SW_DISPATCH_ROUND`，不管下一个轮循的 `worker` 进程会不会第一个处理完毕，这也是 `Stream` 模式相对于其他模式的优点。
 
-```
+```c
 static sw_inline int swServer_worker_schedule(swServer *serv, int fd, swEventData *data)
 {
     uint32_t key;
@@ -1270,7 +1270,7 @@ static sw_inline int swServer_worker_schedule(swServer *serv, int fd, swEventDat
 - `swReactorThread_send2worker` 函数尝试利用非阻塞方式使用系统调用 `write`，
 - 如果失败，就根据 `target_worker_id` 获取相对应的 `reactor_id`, 将数据放入 `in_buffer` 当中，设置 `pipe_fd` 的读写就绪监控(`swReactorThread_loop` 函数中仅仅 `add`，并没有对读写就绪事件进行监控)，等待着 `pipe_master` 写就绪。
 
-```
+```c
 int swReactorThread_send2worker(void *data, int len, uint16_t target_worker_id)
 {
     swServer *serv = SwooleG.serv;

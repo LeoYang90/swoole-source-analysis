@@ -21,7 +21,7 @@
 - `timewheel`、`heartbeat_interval`、`last_heartbeat_time` 是心跳检测，专门剔除空闲连接
 - `last_malloc_trim_time` 记录了上次返还给系统的时间，`swoole` 会定期的通过 `malloc_trim` 函数返回空闲的内存空间
  
-```
+```c
 struct _swReactor
 {
     void *object;
@@ -121,7 +121,7 @@ struct _swReactor
 - `defer` 函数用于添加 `defer_callback_list` 成员变量，这个成员变量是回调函数列表，`epoll` 函数超时和  `onFinish` 都会循环 `defer_callback_list` 里面的回调函数
 - `socket_array` 是监听的 `fd` 列表
 
-```
+```c
 int swReactor_create(swReactor *reactor, int max_event)
 {
     int ret;
@@ -159,7 +159,7 @@ int swReactor_create(swReactor *reactor, int max_event)
 
 - `reactor` 中设置的 `fd` 由两部分构成，一种是 `swFd_type`，标识着文件描述符的类型，一种是 `swEvent_type` 标识着文件描述符感兴趣的读写事件
 
-```
+```c
 enum swFd_type
 {
     SW_FD_TCP             = 0, //tcp socket
@@ -191,7 +191,7 @@ enum swEvent_type
 ```
 - `swReactor_fdtype` 用于从文件描述符中提取 `swFd_type`，也就是文件描述符的类型：
 
-```
+```c
 static sw_inline int swReactor_fdtype(int fdtype)
 {
     return fdtype & (~SW_EVENT_READ) & (~SW_EVENT_WRITE) & (~SW_EVENT_ERROR);
@@ -199,7 +199,7 @@ static sw_inline int swReactor_fdtype(int fdtype)
 ```
 - `swReactor_event_read`、`swReactor_event_write`、`swReactor_event_error` 这三个函数与 `swFd_type` 正相反，是从文件描述符中提取读写事件	
 
-```
+```c
 static sw_inline int swReactor_event_read(int fdtype)
 {
     return (fdtype < SW_EVENT_DEAULT) || (fdtype & SW_EVENT_READ);
@@ -219,7 +219,7 @@ static sw_inline int swReactor_event_error(int fdtype)
 
 - `swReactor_setHandle` 用于为文件描述符 `_fdtype` 设定读就绪、写就绪的回调函数
 
-```
+```c
 int swReactor_setHandle(swReactor *reactor, int _fdtype, swReactor_handle handle)
 {
     int fdtype = swReactor_fdtype(_fdtype);
@@ -258,7 +258,7 @@ int swReactor_setHandle(swReactor *reactor, int _fdtype, swReactor_handle handle
 - `defer` 函数会在每次事件循环结束或超时的时候调用
 - `swReactor_defer` 函数会为 `defer_callback_list` 添加新的回调函数
 
-```
+```c
 static int swReactor_defer(swReactor *reactor, swCallback callback, void *data)
 {
     swDefer_callback *cb = sw_malloc(sizeof(swDefer_callback));
@@ -279,7 +279,7 @@ static int swReactor_defer(swReactor *reactor, swCallback callback, void *data)
 
 `epoll` 在设置的时间内没有返回的话，也会自动返回，这个时候就会调用超时回调函数：
 
-```
+```c
 static void swReactor_onTimeout(swReactor *reactor)
 {
     swReactor_onTimeout_and_Finish(reactor);
@@ -300,7 +300,7 @@ static void swReactor_onTimeout(swReactor *reactor)
 - 如果当前 `SwooleG.serv` 为空，`swReactor_empty` 函数用于判断当前 `reactor` 是否还有事件在监听，如果没有，那么就会设置 `running` 为 0
 - 判断当前时间是否可以调用 `malloc_trim` 释放空闲的内存，如果距离上次释放内存的时间超过了 `SW_MALLOC_TRIM_INTERVAL`，就更新 `last_malloc_trim_time` 并调用 `malloc_trim`
 
-```
+```c
 static void swReactor_onTimeout_and_Finish(swReactor *reactor)
 {
     //check timer
@@ -363,7 +363,7 @@ static void swReactor_onTimeout_and_Finish(swReactor *reactor)
 - `event_num` 如果为 0，可以返回 true，结束事件循环
 - 对于协程来说，还要调用 `can_exit` 来判断是否可以退出事件循环
 
-```
+```c
 int swReactor_empty(swReactor *reactor)
 {
     //timer
@@ -398,7 +398,7 @@ int swReactor_empty(swReactor *reactor)
 - 每次事件循环结束之后，都会调用 `onFinish` 函数
 - 该函数主要函数调用 `swReactor_onTimeout_and_Finish`，在此之前还会检查在事件循环过程中是否有信号触发
 
-```
+```c
 static void swReactor_onFinish(swReactor *reactor)
 {
     //check signal
@@ -417,7 +417,7 @@ static void swReactor_onFinish(swReactor *reactor)
 - 当一个 `socket` 关闭的时候，会调用 `close` 函数，对应的回调函数就是 `swReactor_close`
 - 该函数用于释放 `swConnection` 内部申请的内存，并调用 `close` 函数关闭连接
 
-```
+```c
 int swReactor_close(swReactor *reactor, int fd)
 {
     swConnection *socket = swReactor_get(reactor, fd);
@@ -444,7 +444,7 @@ int swReactor_close(swReactor *reactor, int fd)
 - `socket_list` 这个列表与 `connection_list` 保持一致，是事先申请的大小为 `max_connection` 的类型是 `swConnection` 的数组
 - `socket_list` 中的数据有一部分是已经建立连接的 `swConnection` 的对象，有一部分仅仅是空的 `swConnection`，这个时候 `swConnection->fd` 为 0
 
-```
+```c
 static sw_inline swConnection* swReactor_get(swReactor *reactor, int fd)
 {
     if (reactor->thread)
@@ -477,7 +477,7 @@ static sw_inline swConnection* swReactor_get(swReactor *reactor, int fd)
 - 如果 `out_buffer` 不为空，那么说明此时 `socket` 不可写，那么就要将数据拷贝到 `out_buffer` 中去，等着 `reactor` 监控到写就绪之后，把 `out_buffer` 发送出去。
 - 如果此时 `out_buffer` 存储空间不足，那么就要 `swYield` 让进程休眠一段时间，等待 `fd` 的写就绪状态
 
-```
+```c
 int swReactor_write(swReactor *reactor, int fd, void *buf, int n)
 {
     int ret;

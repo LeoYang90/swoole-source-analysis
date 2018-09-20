@@ -8,7 +8,7 @@
 
 `Signal` 模块的数据结构很简单，就是一个 `swSignal` 类型的数组，数组大小是 128。`swSignal` 中存放着信号的回调函数 `callback`，信号 `signo`，是否启用 `active`。
 
-```
+```c
 typedef void (*swSignalHander)(int);
 #define SW_SIGNO_MAX      128
 
@@ -30,7 +30,7 @@ static swSignal signals[SW_SIGNO_MAX];
 
 值得注意的是处理的信号 `SIGKILL` 和 `SIGSTOP` 无法被阻塞。
 
-```
+```c
 void swSignal_none(void)
 {
     sigset_t mask;
@@ -48,7 +48,7 @@ void swSignal_none(void)
 
 添加信号就是向 `signals` 数组添加一个新的信号元素，然后调用 `swSignal_set` 函数进行信号处理函数的注册。如果使用的是 `signalfd`，那么使用的是 `swSignalfd_set` 函数。
 
-```
+```c
 void swSignal_add(int signo, swSignalHander func)
 {
 #ifdef HAVE_SIGNALFD
@@ -74,7 +74,7 @@ void swSignal_add(int signo, swSignalHander func)
 
 `swSignal_set` 函数主要是调用 `sigaction` 为整个进程设置信号处理函数。如果设置 `func` 为 `-1`，信号处理函数是系统默认，如果 `func` 是 `null`，就会忽略该信号。如果 `mask` 为 1，那么在处理该信号的时候会阻塞所有信号，如果 `mask` 为 0，那么在处理该信号的时候就不会阻塞任何信号。
 
-```
+```c
 swSignalHander swSignal_set(int sig, swSignalHander func, int restart, int mask)
 {
     //ignore
@@ -113,7 +113,7 @@ swSignalHander swSignal_set(int sig, swSignalHander func, int restart, int mask)
 
 值得注意的是，这种异步信号处理函数代码一定要简单，一定要是信号安全函数，例如本例中只设置 `SwooleG.main_reactor->singal_no`，等待着返回主流程后再具体执行回调函数；而没有 `main_reactor` 的进程，就要着重注意回调函数是否是信号安全函数。因此从这方面来说，`signalfd` 有着天然的优势，它是文件描述符，由 `epoll` 统一管理，回调函数并不需要异步信号安全。
 
-```
+```c
 static void swSignal_async_handler(int signo)
 {
     if (SwooleG.main_reactor)
@@ -156,7 +156,7 @@ void swSignal_callback(int signo)
 
 清除信号就是遍历 `signals` 数组，将所有的有效信号元素的信号处理函数设置为系统默认。如果使用的是 `signalfd`，那么调用 `swSignalfd_clear` 函数。
 
-```
+```c
 void swSignal_clear(void)
 {
 #ifdef HAVE_SIGNALFD
@@ -188,7 +188,7 @@ void swSignal_clear(void)
 
 使用 `signalfd` 之前需要将 `signalfd_mask`、`signals` 重置。
 
-```
+```c
 static sigset_t signalfd_mask;
 static int signal_fd = 0;
 
@@ -203,7 +203,7 @@ void swSignalfd_init()
 
 `signalfd` 信号启用需要两个步骤，调用 `signalfd` 函数创建信号描述符，`reactor->add` 添加到 `reactor` 事件循环中。
 
-```
+```c
 int swSignalfd_setup(swReactor *reactor)
 {
     if (signal_fd == 0)
@@ -237,7 +237,7 @@ int swSignalfd_setup(swReactor *reactor)
 
 使用 `signalfd` 函数对 `signal_fd` 设置信号处理函数的时候，要先将对应的信号进行屏蔽 `sigprocmask`，否则很可能会额外执行系统的默认信号处理函数。
 
-```
+```c
 static void swSignalfd_set(int signo, swSignalHander callback)
 {
     if (callback == NULL && signals[signo].active)
@@ -265,7 +265,7 @@ static void swSignalfd_set(int signo, swSignalHander callback)
 
 `swSignalfd_onSignal` 函数由 `reactor` 事件循环直接调用。
 
-```
+```c
 static int swSignalfd_onSignal(swReactor *reactor, swEvent *event)
 {
     int n;
@@ -301,7 +301,7 @@ static int swSignalfd_onSignal(swReactor *reactor, swEvent *event)
 ### `swSignalfd_clear`——`signalfd` 信号处理函数的清除
 
 
-```
+```c
 static void swSignalfd_clear()
 {
     if (signal_fd)
@@ -338,7 +338,7 @@ static void swSignalfd_clear()
   > 3、若父进程退出导致进程组成为孤儿进程组，且该进程组中有进程处于停止状态（收到SIGSTOP或SIGTSTP信号），该信号会被发送到该进程组中的每一个进程。
 
 
-```
+```c
 int swServer_start(swServer *serv)
 {
     ...
@@ -383,7 +383,7 @@ void swServer_signal_init(swServer *serv)
 - `SIGUSR1`、`SIGUSR2` 是 `manager` 进程默认重启 `worker` 进程的信号，只重启 `task` 进程使用 `SIGUSR2` 信号，重启所有 `worker` 进程使用 `SIGUSR1`，该信号也是 `swoole_server->reload` 函数发送给 `manager` 的信号。
 - `SIGRTMIN` 信号被用于实现重新打开日志文件。在服务器程序运行期间日志文件被 `mv` 移动或 `unlink` 删除后，日志信息将无法正常写入，这时可以向 `Server` 发送 `SIGRTMIN` 信号
 
-```
+```c
 static void swServer_signal_hanlder(int sig)
 {
     swTraceLog(SW_TRACE_SERVER, "signal[%d] triggered.", sig);
@@ -473,7 +473,7 @@ static void swServer_signal_hanlder(int sig)
 
 `master` 线程在 `reactor` 事件循环中负责接受客户端的请求，在 `reactor` 事件循环中 `epoll_wait` 函数可能会被信号中断，这时程序会首先调用 `swSignal_async_handler` 设置 `reactor->singal_no`，然后返回 `n < 0`，执行 `swSignal_callback` 对应的信号处理函数。
 
-```
+```c
 static int swServer_start_proxy(swServer *serv)
 {
 
@@ -536,7 +536,7 @@ static sw_inline int swReactor_error(swReactor *reactor)
 
 而在 `reactor` 事件循环中，`reactor` 中读写就绪的回调函数中仍然可能被信号中断，例如 `accept` 函数，即使 采用非阻塞也有可能被信号中断，这个时候需要忽略这种错误，继续进行 `accept` 直到 `EAGAIN` 错误。事件循环结束前会调用 `onFinish` 函数，该函数会检查 `reactor->singal_no` 并执行相应的信号处理函数。
 
-```
+```c
 int swServer_master_onAccept(swReactor *reactor, swEvent *event)
 {
     ...
@@ -574,7 +574,7 @@ static void swReactor_onFinish(swReactor *reactor)
 
 对于 `reactor` 线程来说，承担了大量 `socket` 流量消息的收发，因此 `reactor` 不应该频繁的被信号中断影响 `reactor` 事件循环的效率。因此，在初始化截断，程序就调用 `swSignal_none` 阻塞了所有的信号，所有的信号处理都由 `master` 主线程来处理。当然 `SIGTERM`、`SIGSTOP` 等信号无法屏蔽。
 
-```
+```c
 static int swReactorThread_loop(swThreadParam *param)
 {
    ...
@@ -592,7 +592,7 @@ static int swReactorThread_loop(swThreadParam *param)
 
 当发生信号时，`wait` 函数将会被中断，返回的 `pid` 小于 0，此时检查被中断的信号并相应进行操作，
 
-```
+```c
 static int swManager_loop(swFactory *factory)
 {
    ...
@@ -694,7 +694,7 @@ static void swManager_signal_handle(int sig)
 
 与 `master` 进程类似，也要忽略 `SIGHUP`、`SIGPIPE` 信号，不同的是忽略了 `SIGUSR1`、`SIGUSR2` 信号。对于 `SIGTERM` 信号，`worker` 进程采取了异步关闭的措施，并不会强硬终止进程，而是要等到 `reactor` 事件循环完毕。
 
-```
+```c
 void swWorker_signal_init(void)
 {
     swSignal_clear();
@@ -769,7 +769,7 @@ void swWorker_signal_handler(int signo)
 
 当 `swMsgQueue_pop`、`accept`、`read` 等函数被信号中断后，信号处理函数会被执行，之后会返回 `n < 0`，这个时候由于信号处理函数已经被执行，因此只需要 `continue` 即可。对于闹钟信号，信号到来，还需要调用 `swTimer_select` 来筛选已经到时间的任务。
 
-```
+```c
 static void swTaskWorker_signal_init(void)
 {
     swSignal_set(SIGHUP, NULL, 1, 0);

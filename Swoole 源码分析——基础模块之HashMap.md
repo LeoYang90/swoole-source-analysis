@@ -6,7 +6,7 @@
 - `HashMap` 比较复杂的地方在于其节点 `swHashMap_node` 的 `UT_hash_handle` 数据成员，该数据成员是 `C` 语言 `hash` 库 `uthash`，`HashMap` 大部分功能依赖于这个 `uthash`。
 - `swHashMap_node` 中 `key_int` 是键值的长度，`key_str` 是具体的键值，`data` 是 `value` 数据
 
-```
+```c
 typedef void (*swHashMap_dtor)(void *data);
 
 typedef struct
@@ -35,7 +35,7 @@ typedef struct swHashMap_node
 - `HashMap` 的初始化主要是对底层 `uthash` 哈希表进行内存的分配、初始化
 - `uthash` 哈希表的初始化包括 `tbl`、`buckets` 的初始化，成员变量的具体意义可以参考下一节内容
 
-```
+```c
 swHashMap* swHashMap_new(uint32_t bucket_num, swHashMap_dtor dtor)
 {
     swHashMap *hmap = sw_malloc(sizeof(swHashMap));
@@ -94,7 +94,7 @@ swHashMap* swHashMap_new(uint32_t bucket_num, swHashMap_dtor dtor)
 - 为 `UT_hash_handler` 的 `prev`、`next`、`key`、`keylen`、`hashv`、`tbl` 成员变量赋值，将新的 `UT_hash_handler` 放入双向链表的尾部，更新 `tbl` 的 `tail` 成员
 - 利用 `HASH_ADD_TO_BKT` 函数将 `UT_hash_handler` 插入到哈希桶中
 
-```
+```c
 int swHashMap_add(swHashMap* hmap, char *key, uint16_t key_len, void *data)
 {
     swHashMap_node *node = (swHashMap_node*) sw_malloc(sizeof(swHashMap_node));
@@ -137,7 +137,7 @@ static sw_inline int swHashMap_node_add(swHashMap_node *root, swHashMap_node *ad
 
 - `swHashMap_add_int` 直接调用 `HASH_ADD_INT` 更新整个哈希表，比起 `swHashMap_add` 函数，没有了复杂的 `uthash` 数据结构的更新
 
-```
+```c
 int swHashMap_add_int(swHashMap *hmap, uint64_t key, void *data)
 {
     swHashMap_node *node = (swHashMap_node*) sw_malloc(sizeof(swHashMap_node));
@@ -161,7 +161,7 @@ int swHashMap_add_int(swHashMap *hmap, uint64_t key, void *data)
 - 首先先通过哈希键计算哈希值，找出哈希桶的索引
 - `HASH_FIND_IN_BKT` 会根据哈希桶来查找具体的元素
 
-```
+```c
 void* swHashMap_find(swHashMap* hmap, char *key, uint16_t key_len)
 {
     swHashMap_node *root = hmap->root;
@@ -193,7 +193,7 @@ static sw_inline swHashMap_node *swHashMap_node_find(swHashMap_node *root, char 
 
 - `swHashMap_find_int` 函数直接调用 `HASH_FIND_INT` 查找
 
-```
+```c
 void* swHashMap_find_int(swHashMap* hmap, uint64_t key)
 {
     swHashMap_node *ret = NULL;
@@ -212,7 +212,7 @@ void* swHashMap_find_int(swHashMap* hmap, uint64_t key)
 
 - `swHashMap_each` 利用迭代器不断获取下一个元素
 
-```
+```c
 void* swHashMap_each(swHashMap* hmap, char **key)
 {
     swHashMap_node *node = swHashMap_node_each(hmap);
@@ -257,7 +257,7 @@ static sw_inline swHashMap_node* swHashMap_node_each(swHashMap* hmap)
 
 ### `swHashMap_count` 函数
 
-```
+```c
 uint32_t swHashMap_count(swHashMap* hmap)
 {
     if (hmap == NULL)
@@ -273,7 +273,7 @@ uint32_t swHashMap_count(swHashMap* hmap)
 
 - 删除元素首先需要 `swHashMap_node_delete` 函数来重构哈希表，然后调用 `swHashMap_node_free` 释放内存
 
-```
+```c
 int swHashMap_del(swHashMap* hmap, char *key, uint16_t key_len)
 {
     swHashMap_node *root = hmap->root;
@@ -296,7 +296,7 @@ static sw_inline void swHashMap_node_free(swHashMap *hmap, swHashMap_node *node)
 ```
 - 删除重构哈希表流程较为复杂，步骤和 `HASH_DELETE` 函数逻辑一致，详细可以看下一节
 
-```
+```c
 static int swHashMap_node_delete(swHashMap_node *root, swHashMap_node *del_node)
 {
     unsigned bucket;
@@ -339,7 +339,7 @@ static int swHashMap_node_delete(swHashMap_node *root, swHashMap_node *del_node)
 
 - `swHashMap_del_int` 函数没有复杂逻辑，直接调用了 `HASH_DEL` 这个第三方库
 
-```
+```c
 int swHashMap_del_int(swHashMap *hmap, uint64_t key)
 {
     swHashMap_node *ret = NULL;
@@ -362,7 +362,7 @@ int swHashMap_del_int(swHashMap *hmap, uint64_t key)
 - 销毁哈希表需要循环所有的哈希节点元素，逐个删除
 - `HASH_ITER` 用于循环所有的哈希节点元素
 
-```
+```c
 void swHashMap_free(swHashMap* hmap)
 {
     swHashMap_node *find, *tmp = NULL;
@@ -408,7 +408,7 @@ void swHashMap_free(swHashMap* hmap)
     - `bloom_bv`：指向一个 `uint8_t` 类型的数组，用来标记 `buckets` 中每个链表是否为空，可以优化查找的速度，因为这个数组中每个元素是一个字节，所以每个元素可以标记8个链表，例如要判断 `bucket[1]->hh_head` 是否为空，只要判断`(bloom_bv[0] & 2)` 是否为0即可;
     - `bloom_nbits`：`bloom_bv` 指向的数组大小为 (1 << `bloom_nbits`)。
 
-```
+```c
 typedef struct UT_hash_table {
    UT_hash_bucket *buckets;
    unsigned num_buckets, log2_num_buckets;
@@ -441,7 +441,7 @@ typedef struct UT_hash_table {
 - `key`、`keylen` 是存储的键值与长度，`hashv` 是键值的哈希值
 - `tbl` 是上一小节的 `UT_hash_table`	
 
-```
+```c
 typedef struct UT_hash_handle {
    struct UT_hash_table *tbl;
    void *prev;                       /* prev element in app order      */
@@ -467,7 +467,7 @@ typedef struct UT_hash_handle {
 
 
 
-```
+```c
 typedef struct UT_hash_bucket {
    struct UT_hash_handle *hh_head;
    unsigned count;
@@ -483,7 +483,7 @@ typedef struct UT_hash_bucket {
 
 我们之前说 `UT_hash_handle` 元素构成了两套双向链表，`prev`、`next` 构成了其中一套，但是确切地说 `prev`、`next` 指向的地址并不是 `UT_hash_handle` 的地址，而是它的上一层。例如我们之前说的：
 
-```
+```c
 typedef struct swHashMap_node
 {
     uint64_t key_int;
@@ -498,7 +498,7 @@ typedef struct swHashMap_node
 `ELMT_FROM_HH` 就是通过 `UT_hash_handle` 的地址反算 `swHashMap_node` 地址的函数：
 
 
-```
+```c
 #define ELMT_FROM_HH(tbl,hhp) ((void*)(((char*)(hhp)) - ((tbl)->hho)))
 
 ```
@@ -507,7 +507,7 @@ typedef struct swHashMap_node
 
 - `HASH_TO_BKT` 函数根据哈希值计算哈希桶的索引值，因为哈希值会很大，必然要转为哈希桶数组的 `index`
 
-```
+```c
 #define HASH_TO_BKT( hashv, num_bkts, bkt )                                      \
 do {                                                                             \
   bkt = ((hashv) & ((num_bkts) - 1));                                            \
@@ -519,7 +519,7 @@ do {                                                                            
 
 - `HASH_MAKE_TABLE` 函数用于创建 `UT_hash_table`
 
-```
+```c
 #define HASH_MAKE_TABLE(hh,head)                                                 \
 do {                                                                             \
   (head)->hh.tbl = (UT_hash_table*)uthash_malloc(                                \
@@ -548,7 +548,7 @@ do {                                                                            
 - 新添加的元素会替换哈希桶的 `hh_head`
 - 如果当前哈希桶中的 `UT_hash_handle` 元素数量过多，就会考虑扩充 `UT_hash_bucket` 的数量，并且重新分配
 
-```
+```c
 /* add an item to a bucket  */
 #define HASH_ADD_TO_BKT(head,addhh)                                              \
 do {                                                                             \
@@ -573,7 +573,7 @@ do {                                                                            
 - 更新 `UT_hash_table` 的 `num_buckets`、`log2_num_buckets`
 - 重新计算	`nonideal_items` 值，如果大于元素的一半，说明哈希冲突仍然严重，哈希桶的扩容并不能解决问题，那么就将 `ineff_expands` 递增，必要的时候禁止哈希桶的扩容
 
-```
+```c
 #define HASH_EXPAND_BUCKETS(tbl)                                                 \
 do {                                                                             \
     unsigned _he_bkt;                                                            \
@@ -632,7 +632,7 @@ do {                                                                            
  - 利用 `HASH_FCN` 计算哈希值，并利用 `HASH_ADD_TO_BKT` 将其放入对应的哈希桶中
  - `HASH_BLOOM_ADD` 函数为 `bloom_bv` 设置位，用于快速判断当前 `hashv` 值存在元素
 
-```
+```c
 #define HASH_ADD_INT(head,intfield,add)                                          \
     HASH_ADD(hh,head,intfield,sizeof(int),add)
     
@@ -678,7 +678,7 @@ do {                                                                            
 - 不断循环 `hh_next`、`hh_pre` 组成的双向链表，找出与 `keyptr` 相同的元素
 
 
-```
+```c
 #define HASH_KEYCMP(a,b,len) memcmp(a,b,len) 
 
 #define DECLTYPE(x) (__typeof(x))
@@ -711,7 +711,7 @@ do {                                                                            
 - `HASH_FCN` 实际上是 `Jenkins` 哈希算法，用于计算哈希值
 - `HASH_BLOOM_TEST` 用于快速判断哈希桶内到底有没有元素，如果没有那么没有必要进行下去
 
-```
+```c
 #define HASH_FIND_INT(head,findint,out)                                          \
     HASH_FIND(hh,head,findint,sizeof(int),out)
     
@@ -743,7 +743,7 @@ do {                                                                            
 
 - `HASH_COUNT` 函数用于计算所有元素的数量
 
-```
+```c
 #define HASH_COUNT(head) HASH_CNT(hh,head) 
 #define HASH_CNT(hh,head) ((head)?((head)->hh.tbl->num_items):0)
 
@@ -753,7 +753,7 @@ do {                                                                            
 
 - `HASH_DEL_IN_BKT` 函数用于删除已知的哈希桶的某一个链表元素
 
-```
+```c
 #define HASH_DEL_IN_BKT(hh,head,hh_del)                                          \
     (head).count--;                                                              \
     if ((head).hh_head == hh_del) {                                              \
@@ -775,7 +775,7 @@ do {                                                                            
 - `HASH_DEL` 函数不仅更新了哈希桶的链表结构，还更新了 `UT_hash_handle` 双向链表结构和 `UT_hash_table` 的 `tail` 成员变量
 - `HASH_DEL` 函数最后利用了 `HASH_DEL_IN_BKT` 函数更新哈希桶的链表数据
 
-```
+```c
 #define HASH_DEL(head,delptr)                                                    \
     HASH_DELETE(hh,head,delptr)
     
@@ -820,7 +820,7 @@ do {                                                                            
 
 - `HASH_ITER` 函数用于循环所有的哈希表的元素
 
-```
+```c
 #define HASH_ITER(hh,head,el,tmp)                                                \
 for((el)=(head),(tmp)=DECLTYPE(el)((head)?(head)->hh.next:NULL);                 \
    el; (el)=(tmp),(tmp)=DECLTYPE(el)((tmp)?(tmp)->hh.next:NULL))
@@ -833,7 +833,7 @@ for((el)=(head),(tmp)=DECLTYPE(el)((head)?(head)->hh.next:NULL);                
 
 - `swoole_hash_php` 算法
 
-```
+```c
 static inline uint64_t swoole_hash_php(char *key, uint32_t len)
 {
     register ulong_t hash = 5381;
@@ -874,7 +874,7 @@ static inline uint64_t swoole_hash_php(char *key, uint32_t len)
 
 - `swoole_hash_austin` 算法
 
-```
+```c
 static inline uint32_t swoole_hash_austin(char *key, unsigned int keylen)
 {
     unsigned int h, k;

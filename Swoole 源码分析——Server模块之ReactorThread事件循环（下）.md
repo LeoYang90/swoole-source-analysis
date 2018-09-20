@@ -6,7 +6,7 @@
 - 如果启用了 `EOF` 自动分包，那么 `swoole` 会检测 `EOF` 符号，拼接完毕数据之后再向 `worker` 发送数据
 - `swProtocol_recv_check_eof` 用于检测 `EOF` 符号，如果没有检测到数据就存储到 `buffer`。
 
-```
+```c
 static int swPort_onRead_check_eof(swReactor *reactor, swListenPort *port, swEvent *event)
 {
     swConnection *conn = event->socket;
@@ -54,7 +54,7 @@ static sw_inline swString *swServer_get_buffer(swServer *serv, int fd)
 - 如果超过了 `protocol->package_max_length` 大小，那么说明一直没有发送成功，就会返回错误，结束当前连接
 - 如果缓冲区不足，那么就将缓冲区扩容到 `protocol->package_max_length`，继续接受数据
 
-```
+```c
 int swProtocol_recv_check_eof(swProtocol *protocol, swConnection *conn, swString *buffer)
 {
     int recv_again = SW_FALSE;
@@ -163,7 +163,7 @@ int swProtocol_recv_check_eof(swProtocol *protocol, swConnection *conn, swString
 - 找到了 `EOF` 之后，就要调用 `protocol->onPackage` 函数，发送给 `worker` 进程
 - 接着就要从剩余的数据里面循环不断寻找 `EOF`，调用 `protocol->onPackage` 函数
 
-```
+```c
 static sw_inline int swProtocol_split_package_by_eof(swProtocol *protocol, swConnection *conn, swString *buffer)
 {
 #if SW_LOG_TRACE_OPEN > 0
@@ -252,7 +252,7 @@ static sw_inline int swProtocol_split_package_by_eof(swProtocol *protocol, swCon
 
 - 类似地本函数也是调用 `swProtocol_recv_check_length` 来进行包长检测
 
-```
+```c
 static int swPort_onRead_check_length(swReactor *reactor, swListenPort *port, swEvent *event)
 {
     swServer *serv = reactor->ptr;
@@ -286,7 +286,7 @@ static int swPort_onRead_check_length(swReactor *reactor, swListenPort *port, sw
 		- 如果接受到的数据已经大于包长，那么就调用 `onPackage` 发送。之后如果仍然有剩余未发送的数据，那么就 `do_get_length`；如果已经没有剩余数据了，继续去取下一个数据包。
 		- 如果数据还是不够，那么就返回，等待读就绪事件
 
-```
+```c
 int swProtocol_recv_check_length(swProtocol *protocol, swConnection *conn, swString *buffer)
 {
     int package_length;
@@ -423,7 +423,7 @@ int swProtocol_recv_check_length(swProtocol *protocol, swConnection *conn, swStr
 
 本函数逻辑很简单，如果长度连 `length` 都不够，那么包长信息并不在 `data` 中，直接返回继续接受数据。拿到 `length` 后，要用 `swoole_unpack` 函数转化为相应的类型即可得到包长值。
 
-```
+```c
 int swProtocol_get_package_length(swProtocol *protocol, swConnection *conn, char *data, uint32_t size)
 {
     uint16_t length_offset = protocol->package_length_offset;
@@ -515,7 +515,7 @@ static sw_inline int32_t swoole_unpack(char type, void *data)
 - 值得注意的是 `write` 的返回结果不需要关心到底写入了多少，因为对于 `linux` 来说，`pipe` 可以保证 `write`  小于 `PIPE_BUF` 大小数据的原子性，不是全部写入成功，就是写入失败，不会出现写入部分数据的可能。
 - 当所有的数据都发送成功后，取消写就绪监控，防止重复浪费调用
 
-```
+```c
 static int swReactorThread_onPipeWrite(swReactor *reactor, swEvent *ev)
 {
     int ret;
@@ -607,7 +607,7 @@ static int swReactorThread_onPipeWrite(swReactor *reactor, swEvent *ev)
 - 如果是临时文件，`worker` 发送过来的数据是临时文件的名字，需要调用 `swTaskWorker_large_unpack` 将文件内容读取到 `SwooleTG.buffer_stack` 中去
 - `swReactorThread_send` 函数用于向客户端发送数据
 
-```
+```c
 typedef struct _swSendData
 {
     swDataHead info;
@@ -738,7 +738,7 @@ static sw_inline swString* swTaskWorker_large_unpack(swEventData *task_result)
 - 如果 `conn->out_buffer` 为空，那么就尝试向 `socket` 写数据，如果没有全部写入成功，那么就将数据放入 `conn->out_buffer` 中去，并开启事件监听
 - 如果 `conn->out_buffe` 数据量过大，需要设置 `conn->high_watermark` 为 1，调用 `onBufferFull` 回调
 
-```
+```c
 int swReactorThread_send(swSendData *_send)
 {
     swServer *serv = SwooleG.serv;
@@ -946,7 +946,7 @@ int swReactorThread_send(swSendData *_send)
 
 对于文件的发送，`swoole` 将文件的信息存储在 `swTask_sendfile` 对象中，然后将其放入 `conn->out_buffer` 中。
 
-```
+```c
 typedef struct {
 	char *filename;
 	uint16_t name_len;
@@ -1035,7 +1035,7 @@ int swConnection_sendfile(swConnection *conn, char *filename, off_t offset, size
 - 发送数据结束后，再将 `TCP_CORK` 设置为 0
  
 
-```
+```c
 static sw_inline int swSocket_tcp_nopush(int sock, int nopush)
 {
     return setsockopt(sock, IPPROTO_TCP, TCP_CORK, (const void *) &nopush, sizeof(int));

@@ -10,7 +10,7 @@
 
 `_swTimer_node` 中 `heap_node` 是 `_swTimer` 中的数据堆元素；`data` 一般存储 `server`；`callback` 是定时器触发后需要执行的回调函数；`exec_msec` 是该元素应该执行的时间；`id` 是元素在 `swTimer` 中的 `id`；`type` 有三种：`SW_TIMER_TYPE_KERNEL`（`server` 内置定时函数）、`SW_TIMER_TYPE_CORO`（协程定时函数）、`SW_TIMER_TYPE_PHP`(`PHP` 定时函数)
 
-```
+```c
 struct _swTimer
 {
     /*--------------timerfd & signal timer--------------*/
@@ -54,7 +54,7 @@ struct _swTimer_node
 - 如果是 `worker` 进程，那么调用 `swSystemTimer_init` 函数对定时器进行初始化；如果是 `master` 进程，那么调用 `swReactorTimer_init` 进行初始化
 
 
-```
+```c
 int swTimer_now(struct timeval *time)
 {
 #if defined(SW_USE_MONOTONIC_TIME) && defined(CLOCK_MONOTONIC)
@@ -120,7 +120,7 @@ int swTimer_init(long msec)
 
 对于 `master` 进程，只需要设置 `main_reactor` 的超时时间即可，当发生超时事件之后，`main_reactor` 会调用 `onTimeout` 函数；或者一个事件循环最后，会调用 `onFinish` 函数；这两个函数都会最终调用 `swTimer_select`，来筛选那些已经到了执行时间的元素。
 
-```
+```c
 static int swReactorTimer_init(long exec_msec)
 {
     SwooleG.main_reactor->check_timer = SW_TRUE;
@@ -218,7 +218,7 @@ static void swReactor_onTimeout_and_Finish(swReactor *reactor)
 - 对于普通 `SIGALRM` 信号来说，将 `timer->pipe` 放入 `reactor` 的监控中，使用 `setitimer` 来定时触发 `SIGALRM` 信号，设置信号处理函数。信号处理函数中，会向 `timer->pipe` 写入数据，进而触发 `swTimer_select` 执行定时函数。
 
 
-```
+```c
 int swSystemTimer_init(int interval, int use_pipe)
 {
     swTimer *timer = &SwooleG.timer;
@@ -277,7 +277,7 @@ int swSystemTimer_init(int interval, int use_pipe)
 - `timefd` 可以由 `timerfd_create` 系统函数创建
 - `itimerspec` 对象需要当前时间和 `interval` 间隔时间共同设置。`it_value` 是首次超时时间，需要填写当前时间，并加上要超时的时间，值得注意的是 `tv_nsec` 加上去后一定要判断是否超出1000000000（如果超过要秒加一），否则会设置失败；`it_interval` 是后续周期性超时时间。
 
-```
+```c
 static int swSystemTimer_timerfd_set(swTimer *timer, long interval)
 {
 
@@ -349,7 +349,7 @@ static int swSystemTimer_timerfd_set(swTimer *timer, long interval)
 	- `it_interval` 为计时间隔，`it_value` 为延时时长，也就是距离现有时间第一次延迟触发的相对时间，而不是绝对时间。（所以我认为代码中 `gettimeofday` 函数是多余的，并不需要获取当前时间）
 
 
-```
+```c
  */
 static int swSystemTimer_signal_set(swTimer *timer, long interval)
 {
@@ -394,7 +394,7 @@ static int swSystemTimer_signal_set(swTimer *timer, long interval)
 
 `swSystemTimer_signal_handler` 函数是 `SIGALARM` 信号的处理函数，该函数被触发说明 `epoll_wait` 函数被闹钟信号中断，此时本函数向 `timer.pipe` 写入数据，然后即返回。`reactor` 会检测到 `timer.pipe` 的写就绪，进而调用对应的回调函数 `swSystemTimer_event_handler` 
 
-```
+```c
 void swSystemTimer_signal_handler(int sig)
 {
     SwooleG.signal_alarm = 1;
@@ -412,7 +412,7 @@ void swSystemTimer_signal_handler(int sig)
 
 写就绪回调函数可能是由 `timer.pipe` 的写就绪触发，也可能是 `timefd` 的写就绪触发，无论哪个都会调用 `swTimer_select` 函数执行对应的定时函数。
 
-```
+```c
 int swSystemTimer_event_handler(swReactor *reactor, swEvent *event)
 {
     uint64_t exp;
@@ -433,7 +433,7 @@ int swSystemTimer_event_handler(swReactor *reactor, swEvent *event)
 - `swTimer_add` 用于添加定时函数元素。本函数逻辑比较简单，新建一个 `swTimer_node` 对象，初始化赋值之后加入到 `timer->heap` 中，程序会自动根据其 `exec_msec` 进行有小到大的排序，然后再更新 `timer->map` 哈希表。
 - 值得注意的是，当新添加的定时函数需要执行的时间小于当前 `timer` 下次执行时间的时候，我们需要调用 `timer->set` 函数更新 `time` 的间隔时间。在 `master` 进程中，这个 `set` 函数是 `swReactorTimer_set`，用于设置 `reactor` 的超时时间；在 `worker` 进程中，`set` 函数是 `swSystemTimer_set`，用于更新 `timerfd_settime` 或 `setitimer` 函数。
  
-```
+```c
 static swTimer_node* swTimer_add(swTimer *timer, int _msec, int interval, void *data, swTimerCallback callback)
 {
     swTimer_node *tnode = sw_malloc(sizeof(swTimer_node));
@@ -502,7 +502,7 @@ static int swSystemTimer_set(swTimer *timer, long new_interval)
 
 ### `swTimer_del` 删除元素
 
-```
+```c
 int swTimer_del(swTimer *timer, swTimer_node *tnode)
 {
     if (tnode->remove)
@@ -536,7 +536,7 @@ int swTimer_del(swTimer *timer, swTimer_node *tnode)
 - 如果当前的定时元素超过了当前时间，说明该元素应该执行定时函数。设置 `timer->_current_id` 为当前的 `id` 后，执行 `tnode->callback` 回调函数；如果当前定时元素不是一次执行的任务，而是需要每隔一段时间定时的任务，就要再次将元素放入 `timer->heap` 中；如果当前定时元素是一次执行的任务，就要将元素从 `timer->map`、`timer->map` 中删除
 - 循环结束后，`tnode` 就是下一个要执行的定时元素，我们需要调用 `timer->set` 函数设置闹钟信号（`worker` 进程）或者 `reactor` 超时时间（`master` 进程）。
 
-```
+```c
 int swTimer_select(swTimer *timer)
 {
     int64_t now_msec = swTimer_get_relative_msec();
@@ -601,7 +601,7 @@ int swTimer_select(swTimer *timer)
 
 `timer` 模块在 `master` 进程中最重要的作用是每隔一秒更新 `serv->gs->now` 的值。除此之外，当 `reactor` 线程调度 `worker` 进程时，如果一段时间内没有任何空闲的 `worker` 进程空闲，`timer` 模块还负责写入错误日志。
 
-```
+```c
 static int swServer_start_proxy(swServer *serv)
 {
     ...
@@ -652,7 +652,7 @@ void swServer_update_time(swServer *serv)
 
 `worker` 进程将要停止时，并不会立刻停止，而是会等待事件循环结束后停止，这时为了防止 `worker` 进程不退出，还设置了 30s 的延迟，超过 30s 就会停止该进程。
 
-```
+```c
 static void swWorker_stop()
 {
     swWorker *worker = SwooleWG.worker;
@@ -684,7 +684,7 @@ static void swWorker_onTimeout(swTimer *timer, swTimer_node *tnode)
 
 `timer` 模块另一个非常重要的功能是添加定时任务，一般是使用 `swoole_timer_tick` 函数、`swoole_timer_after` 函数、`swoole_server->tick` 函数、`swoole_server->after` 函数：
  
-```
+```c
 PHP_FUNCTION(swoole_timer_tick)
 {
     long after_ms;
@@ -734,7 +734,7 @@ PHP_FUNCTION(swoole_timer_after)
 
 本函数主要调用 `SwooleG.timer.add` 函数将添加新的定时任务，值得注意的是 `swTimer_callback` 类型的对象 `cb` 和两个回调函数 `php_swoole_onInterval`、`php_swoole_onTimeout`，真正的回调函数存放在了 `swTimer_callback` 对象中，如果用户有参数设置，也会放入 `cb->data` 中。
 
-```
+```c
 long php_swoole_add_timer(int ms, zval *callback, zval *param, int persistent TSRMLS_DC)
 {
     char *func_name = NULL;
@@ -799,7 +799,7 @@ void php_swoole_check_timer(int msec)
 本函数主要调用 `cb->callback`，如果有用户参数，还要将 `cb->data` 放入调用函数中。
 
 
-```
+```c
 void php_swoole_onInterval(swTimer *timer, swTimer_node *tnode)
 {
     zval *retval = NULL;
@@ -843,7 +843,7 @@ void php_swoole_onInterval(swTimer *timer, swTimer_node *tnode)
 与上一个函数类似，只是这次直接从 `timer` 中删除对应的元素。
 
 
-```
+```c
 void php_swoole_onTimeout(swTimer *timer, swTimer_node *tnode)
 {
     {
@@ -887,7 +887,7 @@ void php_swoole_onTimeout(swTimer *timer, swTimer_node *tnode)
 
 时间轮的数据结构比较简单，由哈希表、`size`（循环数组总数量），`current` （循环数组当前最旧的数组元素，`current-1` 是循环数组中最新的数组元素）。`swTimeWheel_new` 函数很简单，就是创建这三个属性。
 
-```
+```c
 typedef struct
 {
     uint16_t current;
@@ -934,7 +934,7 @@ swTimeWheel* swTimeWheel_new(uint16_t size)
 
 当 `main_reactor` 有新连接进入的时候，需要将新的连接添加到时间轮中，新的连接会被放到最新的数组元素中，也就是 `current-1` 的元素中，然后设置 `swConnection` 中的 `timewheel_index`。
 
-```
+```c
 void swTimeWheel_add(swTimeWheel *tw, swConnection *conn)
 {
     uint16_t index = tw->current == 0 ? tw->size - 1 : tw->current - 1;
@@ -952,7 +952,7 @@ void swTimeWheel_add(swTimeWheel *tw, swConnection *conn)
 
 当连接有数据传输的时候，需要更新该连接在时间轮中的位置，将该连接从原有的数组元素中删除，然后添加到最新的数组元素中，也就是 `current-1` 中，然后更新 `swConnection` 中的 `timewheel_index`。
 
-```
+```c
 #define swTimeWheel_new_index(tw)   (tw->current == 0 ? tw->size - 1 : tw->current - 1)
 
 void swTimeWheel_update(swTimeWheel *tw, swConnection *conn)
@@ -975,7 +975,7 @@ void swTimeWheel_update(swTimeWheel *tw, swConnection *conn)
 
 在时间轮中删除该连接，
 
-```
+```c
 void swTimeWheel_remove(swTimeWheel *tw, swConnection *conn)
 {
     swHashMap *set = tw->wheel[conn->timewheel_index];
@@ -989,7 +989,7 @@ void swTimeWheel_remove(swTimeWheel *tw, swConnection *conn)
 
 `swTimeWheel_forward` 将最旧的数组元素 `current` 中所有连接都关闭掉，然后将 `current` 递增。
 
-```
+```c
 void swTimeWheel_forward(swTimeWheel *tw, swReactor *reactor)
 {
     swHashMap *set = tw->wheel[tw->current];
@@ -1032,7 +1032,7 @@ void swTimeWheel_forward(swTimeWheel *tw, swReactor *reactor)
 - 值得注意的是，当允许空闲时间超过 60s 时，`heartbeat_interval * 1000` 是 `reactor` 的超时时间，例如空闲时间是 60s，那么每隔 6s，`reactor` 都会超时来检测空闲连接。当允许空闲时间小于 60s 时，`reactor` 统一每隔 1s 检测空闲连接。
 - 不同于 `master` 进程和 `worker` 线程，`reactor` 的 `onFinish` 和 `onTimeout` 不再采用默认的 `swReactor_onTimeout` 与 `swReactor_onFinish` 函数，而是采用空闲连接检测的 `swReactorThread_onReactorCompleted` 函数，该函数会调用 `swTimeWheel_forward` 来剔除空闲连接。
 
-```
+```c
 #define SW_TIMEWHEEL_SIZE          60
 
 static int swReactorThread_loop(swThreadParam *param)
@@ -1071,7 +1071,7 @@ static int swReactorThread_loop(swThreadParam *param)
 
 当有新连接的时候，`conn->connect_notify` 会被置为 1，此时该连接文件描述符写就绪，然后就会调用 `swReactorThread_onWrite`，此时 `reactor` 线程将该连接添加到时间轮中。
 
-```
+```c
 static int swReactorThread_onWrite(swReactor *reactor, swEvent *ev)
 {
     ...
@@ -1093,7 +1093,7 @@ static int swReactorThread_onWrite(swReactor *reactor, swEvent *ev)
 
 ### `reactor` 线程中时间轮的更新
 
-```
+```c
 static int swReactorThread_onRead(swReactor *reactor, swEvent *event)
 {
     ...
@@ -1112,7 +1112,7 @@ static int swReactorThread_onRead(swReactor *reactor, swEvent *event)
 当连接在允许的空闲时间之内没有任何数据发送，那么时间轮算法就要关闭该连接。关闭连接并不是直接 `close` 套接字，而是需要通知对应的 `worker` 进程调用 `onClose` 函数，然后才能关闭。具体的做法是设置 `swConnection` 的 `close_force`、`close_notify` 等成员变量为 1，并且关闭该连接的读就绪监听事件。
 
 
-```
+```c
 static void swReactorThread_onReactorCompleted(swReactor *reactor)
 {
     swServer *serv = reactor->ptr;
@@ -1147,10 +1147,10 @@ void swTimeWheel_forward(swTimeWheel *tw, swReactor *reactor)
 
 当该连接写就绪的时候，会调用 `swReactorThread_onWrite` 函数。这个时候就会调用 `swServer_tcp_notify` 函数，进而调用 `swFactoryProcess_notify`、`swFactoryProcess_dispatch`，最后调用 `swReactorThread_send2worker` 发送给了 `worker` 进程。
 
-由于 `reactor` 启用的是水平触发，由于并未向该连接写入数据，因此很快又会触发写就绪事件调用 `swReactorThread_onWrite` 函数，这时如果 `disable_notify` 为 1（`dispatch_mode` 为 1 或 3），会直接执行 `swReactorThread_close` 函数关闭连接，假如此时 `conn->out_buffer` 中还有数据未发送，也会被抛弃。如果 `disable_notify` 为 0，则会继续向将要关闭的连接发送数据，直到接收到 `SW_CHUNK_CLOSE` 类型的消息。
+由于 `reactor` 启用的是水平触发，并未向该连接写入数据，因此很快又会触发写就绪事件调用 `swReactorThread_onWrite` 函数，这时如果 `disable_notify` 为 1（`dispatch_mode` 为 1 或 3），会直接执行 `swReactorThread_close` 函数关闭连接，假如此时 `conn->out_buffer` 中还有数据未发送，也会被抛弃。如果 `disable_notify` 为 0，则会继续向将要关闭的连接发送数据，直到接收到 `SW_CHUNK_CLOSE` 类型的消息。
 
 
-```
+```c
 static int swReactorThread_onWrite(swReactor *reactor, swEvent *ev)
 {
     ...
@@ -1212,7 +1212,7 @@ static int swFactoryProcess_dispatch(swFactory *factory, swDispatchData *task)
 
 `worker` 进程收到消息后会调用 `swWorker_onTask` 函数，进而调用 `swFactoryProcess_end` 函数，调用 `serv->onClose` 函数，并设置 `swConnection` 对象的 `closed` 为 1，然后调用 `swFactoryProcess_finish` 函数将数据包发送给 `reactor` 线程。
 
-```
+```c
 int swWorker_onTask(swFactory *factory, swEventData *task)
 {
     switch (task->info.type)
@@ -1276,7 +1276,7 @@ static int swFactoryProcess_end(swFactory *factory, int fd)
 `reactor` 通过 `swReactorThread_onPipeReceive` 收到 `worker` 进程的连接关闭通知后，调用 `swReactorThread_send` 函数。如果连接已经被关闭，或者缓冲区中没有任何数据的时候，直接调用 `reactor->close` 函数，也就是 `swReactorThread_close` 函数；如果缓冲区还有数据，那么需要将消息放到 `conn->out_buffer` 中等待着该连接写就绪回调 `swReactorThread_close` 函数（此时 `close_notify` 已经为 0）。
 
 
-```
+```c
 int swReactorThread_send(swSendData *_send)
 {
     ...
@@ -1346,7 +1346,7 @@ static int swReactorThread_onWrite(swReactor *reactor, swEvent *ev)
 ```
 `swReactorThread_close` 函数会删除 `swConnection` 在 `server` 中的所有痕迹，包括 `reactor` 中的监控，`serv->stats` 的成员变量，`port->connection_num` 递减，从时间轮中删除、`session` 中 `fd` 置空等等工作。而且，还要清空套接字缓存中的所有数据，直接向客户端发送关闭请求。`swReactor_close` 函数释放内存，关闭套接字文件描述符。
 
-```
+```c
 int swReactorThread_close(swReactor *reactor, int fd)
 {
     swServer *serv = SwooleG.serv;

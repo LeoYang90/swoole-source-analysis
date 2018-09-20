@@ -6,7 +6,7 @@
 - 之后调用 `php_swoole_server_before_start` 创建 `swReactorThread` 数组对象、`workers` 进程池对象
 - 最后调用 `swServer_start` 函数创建 `reactor` 线程，`work`、`manager` 等进程，开启事件循环
 
-```
+```c
 PHP_METHOD(swoole_server, start)
 {
     zval *zobject = getThis();
@@ -41,7 +41,7 @@ PHP_METHOD(swoole_server, start)
 
 ## 注册 `PHP` 回调函数
 
-```
+```c
 void php_swoole_register_callback(swServer *serv)
 {
     /*
@@ -116,7 +116,7 @@ void php_swoole_register_callback(swServer *serv)
 - `php_swoole_server_before_start` 主要调用 `swServer_create` 函数
 - `swServer_create` 函数主要任务是 `swReactorThread_create` 创建 `reactor` 多线程
 
-```
+```c
 void php_swoole_server_before_start(swServer *serv, zval *zobject TSRMLS_DC)
 {
     /**
@@ -170,7 +170,7 @@ int swServer_create(swServer *serv)
 - 函数首先申请内存构建 `reactor_threads` 用于存储多线程的各种信息，创建 `connection_list` 保存已建立连接的 `socket` 信息
 - 利用 `swFactoryThread_create` 创建 `reactor` 多线程
 
-```
+```c
 int swReactorThread_create(swServer *serv)
 {
     int ret = 0;
@@ -219,7 +219,7 @@ int swReactorThread_create(swServer *serv)
 
 ### `swFactoryProcess_create` 创建进程池对象
 
-```
+```c
 int swFactoryProcess_create(swFactory *factory, int worker_num)
 {
     swFactoryProcess *object;
@@ -256,7 +256,7 @@ int swFactoryProcess_create(swFactory *factory, int worker_num)
 - `swServer_signal_init` 进行信号初始化
 - `swServer_start_proxy` 创建 `reactor` 多线程，开启事件循环
 
-```
+```c
 int swServer_start(swServer *serv)
 {
     swFactory *factory = &serv->factory;
@@ -427,7 +427,7 @@ int swServer_start(swServer *serv)
 - `fork` 开启一个新进程
 - 退出父进程，在子进程中开启一个新的会话
 
-```
+```c
 int daemon(int nochdir, int noclose)
 {
     pid_t pid;
@@ -483,7 +483,7 @@ int daemon(int nochdir, int noclose)
 - `swWorker_create` 函数用于初始化 `send_shm`、`lock`
 -  `swManager_start` 函数用于启动 `manager` 进程
 
-```
+```c
 static int swFactoryProcess_start(swFactory *factory)
 {
     int i;
@@ -568,7 +568,7 @@ int swWorker_create(swWorker *worker)
 - 对于 `user_worker` 进程，调用 `swManager_spawn_user_worker` 启动 `user_worker ` 进程
 - 调用 `swManager_loop` 进行事件循环，管理 `worker` 等进程
 
-```
+```c
 void swServer_store_pipe_fd(swServer *serv, swPipe *p)
 {
     int master_fd = p->getFd(p, SW_PIPE_MASTER);
@@ -738,7 +738,7 @@ int swManager_start(swFactory *factory)
 
 ### `swManager_spawn_worker` 启动 `worker` 进程
 
-```
+```c
 static pid_t swManager_spawn_worker(swFactory *factory, int worker_id)
 {
     pid_t pid;
@@ -769,7 +769,7 @@ static pid_t swManager_spawn_worker(swFactory *factory, int worker_id)
 
 ### `swManager_spawn_user_worker` 启动 `user_worker` 进程
 
-```
+```c
 pid_t swManager_spawn_user_worker(swServer *serv, swWorker* worker)
 {
     pid_t pid = fork();
@@ -821,7 +821,7 @@ pid_t swManager_spawn_user_worker(swServer *serv, swWorker* worker)
 - 设置 `master` 主线程的线程特有数据
 - 利用 `main_reactor->wait` 等待新的连接
 
-```
+```c
 static int swServer_start_proxy(swServer *serv)
 {
     int ret;
@@ -943,7 +943,7 @@ static int swServer_start_proxy(swServer *serv)
 - `open_tcp_keepalive`: 在 `TCP` 中有一个 `Keep-Alive` 的机制可以检测死连接，应用层如果对于死链接周期不敏感或者没有实现心跳机制，可以使用操作系统提供的 `keepalive` 机制来踢掉死链接。
 - `buffer_high_watermark` 是缓存区高水位线，达到了说明缓冲区即将满了
 
-```
+```c
 int swPort_listen(swListenPort *ls)
 {
     int sock = ls->sock;
@@ -1006,7 +1006,7 @@ int swPort_listen(swListenPort *ls)
 - `pthread_barrier_init`、`pthread_barrier_wait` 等待所有的 `reactor` 线程开启事件循环
 - 利用 `pthread_create` 创建 `reactor` 线程，线程启动函数是 `swReactorThread_loop` 
 
-```
+```c
 int swReactorThread_start(swServer *serv, swReactor *main_reactor_ptr)
 {
     swThreadParam *param;
@@ -1071,7 +1071,7 @@ int swReactorThread_start(swServer *serv, swReactor *main_reactor_ptr)
 
 - 本函数将用于监听的 `socket` 存放到 `connection_list` 当中，并设置相应的 `info` 属性；
 
-```
+```c
 void swServer_store_listen_socket(swServer *serv)
 {
     swListenPort *ls;

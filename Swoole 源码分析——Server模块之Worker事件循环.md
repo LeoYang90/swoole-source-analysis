@@ -13,7 +13,7 @@
 	- 如果 `ManagerProcess.reload_task_worker` 为 1，那么 `wait` 函数由 `SIGUSR2` 打断，此时应该重启所有的 `task_worker` 进程
 	- 如果 	`wait` 返回值正常，那么就要从 `serv->workers`、`serv->gs->task_workers`、`serv->user_worker` 中寻找退出的 `worker` 进程。如果该进程是 `STOPPED` 状态，说明很有可能是调试状态，此时不需要重启，只需要调用 `tracer` 函数
 
-```
+```c
 static void swManager_signal_handle(int sig)
 {
     switch (sig)
@@ -385,7 +385,7 @@ static void swManager_check_exit_status(swServer *serv, int worker_id, pid_t pid
 - 如果 `worker` 的 `dispatch_mode` 是 `stream`，`reactor` 还要监听 `serv->stream_fd`，以便可以更加高效的消费 `reactor` 线程发送的数据
 - `swServer_worker_init` 函数用于初始化 `worker` 进程，`swWorker_onStart` 用于调用回调函数，`swWorker_onStop` 用于停止 `worker` 进程
 
-```
+```c
 int swWorker_loop(swFactory *factory, int worker_id)
 {
     swServer *serv = factory->ptr;
@@ -481,7 +481,7 @@ int swWorker_loop(swFactory *factory, int worker_id)
 - `buffer_input` 用于存储来源于 `reactor` 线程发送的数据，是一个 `serv->reactor_num + serv->dgram_port_num` 大小的数组。
 
 
-```
+```c
 void swWorker_signal_init(void)
 {
     swSignal_clear();
@@ -604,7 +604,7 @@ swString** swServer_create_worker_buffer(swServer *serv)
 - 设定当前 `worker` 的状态为 `SW_WORKER_IDLE` 空闲
 - 如果用户更改了 `worker` 进程的用户与组、进行了重定向根目录，那么我们还要调用 `setgid`、`setuid`、`chroot` 函数进行相应设置
 
-```
+```c
 void swWorker_onStart(swServer *serv)
 {
     /**
@@ -709,7 +709,7 @@ void swWorker_onStart(swServer *serv)
 - 从 `reactor` 中删除对 `pipe_worker`、`stream_fd` 的事件监控
 - `swWorker_try_to_exit` 用于判断当前 `worker` 进程中 `reactor` 是否还有待监听事件，如果没有可以立刻停止进程
 
-```
+```c
 static sw_inline int swReactor_remove_read_event(swReactor *reactor, int fd)
 {
     swConnection *conn = swReactor_get(reactor, fd);
@@ -829,7 +829,7 @@ void swWorker_try_to_exit()
 
 接受数据的时候，如果类型是 `SW_EVENT_PACKAGE_START`，说明后续还有数据，需要将数据合并在一起接受。
 
-```
+```c
 static int swWorker_onPipeReceive(swReactor *reactor, swEvent *event)
 {
     swEventData task;
@@ -875,7 +875,7 @@ static int swWorker_onPipeReceive(swReactor *reactor, swEvent *event)
 - `SW_EVENT_FINISH` 由 `task_worker` 完成任务触发
 - `SW_EVENT_PIPE_MESSAGE` 由发送任务给 `task_worker` 触发
 
-```
+```c
 int swWorker_onTask(swFactory *factory, swEventData *task)
 {
     swServer *serv = factory->ptr;
@@ -1001,7 +1001,7 @@ int swWorker_onTask(swFactory *factory, swEventData *task)
 `swServer_connection_verify` 函数利用 `task->info.fd` 这个 `sessionid` 来验证连接的有效性，如果连接已经关闭，或者已经被删除，那么就要抛弃当前数据
 
 
-```
+```c
 static sw_inline int swWorker_discard_data(swServer *serv, swEventData *task)
 {
     int fd = task->info.fd;
@@ -1072,7 +1072,7 @@ static sw_inline swConnection *swServer_connection_verify_no_ssl(swServer *serv,
 
 该回调函数首先要调用 `php_swoole_get_recv_data` 获取数据，然后 `sw_call_user_function_fast` 执行 `PHP` 的回调函数
 
-```
+```c
 int php_swoole_onReceive(swServer *serv, swEventData *req)
 {
     swFactory *factory = &serv->factory;
@@ -1141,7 +1141,7 @@ int php_swoole_onReceive(swServer *serv, swEventData *req)
 - 如果使用的数据类型是 `SW_EVENT_PACKAGE`，那么数据存储在 `ringBuff` 共享内存池中，我们首先要把数据复制到 `zdata` 当中，然后释放共享内存
 - 如果数据类型是 `SW_EVENT_PACKAGE_END`，那么数据存储在 `SwooleWG.buffer_input` 中
 
-```
+```c
 void php_swoole_get_recv_data(zval *zdata, swEventData *req, char *header, uint32_t header_length)
 {
     char *data_ptr = NULL;
@@ -1199,7 +1199,7 @@ void php_swoole_get_recv_data(zval *zdata, swEventData *req, char *header, uint3
 
 `worker` 进程向客户端发送数据时，会调用 `swoole_server->send` 函数，该函数会调用 `swServer_tcp_send` 函数
 
-```
+```c
 PHP_METHOD(swoole_server, send)
 {
     int ret;
@@ -1242,7 +1242,7 @@ PHP_METHOD(swoole_server, send)
 - 如果是普通模式，那么需要打包类型为 `SW_EVENT_TCP` 的数据，调用 `finish` 函数将数据放入 `pipe` 的缓冲区中
 - 注意小数据 `_send.length` 为 0，大数据 `_send.length` 才会大于 0
 
-```
+```c
 int swServer_tcp_send(swServer *serv, int fd, void *data, uint32_t length)
 {
     swSendData _send;
@@ -1307,7 +1307,7 @@ int swServer_tcp_send(swServer *serv, int fd, void *data, uint32_t length)
 - 如果是小数据包，那么就将数据打包到 `swEventData` 对象中
 - `swWorker_send2reactor` 函数将用于将数据发送到 `reactor` 线程
 
-```
+```c
 static sw_inline int swWorker_get_send_pipe(swServer *serv, int session_id, int reactor_id)
 {
     int pipe_index = session_id % serv->reactor_pipe_num;
@@ -1423,7 +1423,7 @@ static int swFactoryProcess_finish(swFactory *factory, swSendData *resp)
 ### `swTaskWorker_large_pack` 函数
 
 
-```
+```c
 int swTaskWorker_large_pack(swEventData *task, void *data, int data_len)
 {
     swPackage_task pkg;
@@ -1517,7 +1517,7 @@ int swoole_sync_writefile(int fd, void *data, int len)
 - `swWorker_send2reactor` 函数专门负责将 `swEventData` 数据发送到 `pipefd` 的缓冲区中，其使用的是 `main_reactor->write` 方法，我们之前在 `reactor` 中已经了解过。
 - `swWorker_get_send_pipe` 用于计算发送给客户端的 `pipefd`。我们知道，用户可以在任何 `worker` 中调用 `swoole_server->send(int $fd, string $data, int $extraData = 0)` 向客户端发送数据，但是其中的 `fd` 并不一定是本 `worker` 进程负责的 `session_id`。我们可以从 `session_id` 中获取到 `swConnection`，进而获取到 `reactor_id` 线程，但是我们无法确定当前该连接被分配给了那个 `worker`。因此为了均衡各个 `worker`，首先计算出平均每个 `reactor` 负责的 `worker` 数量 `reactor_pipe_num`，然后利用 `session_id` 以取模的方式随机选择其中一个 `worker`，然后计算出该 `worker` 的 `id`，进而取出其 `pipe_worker`
 
-```
+```c
 serv->reactor_pipe_num = serv->worker_num / serv->reactor_num
 
 static sw_inline int swWorker_get_send_pipe(swServer *serv, int session_id, int reactor_id)
@@ -1554,7 +1554,7 @@ int swWorker_send2reactor(swEventData *ev_data, size_t sendn, int session_id)
 
 当用户主动调用 `swoole_server->close` 函数的时候，就会调用本函数。`swFactoryProcess_end` 函数主要用于调用 `onClose` 函数，进而调用 ``swFactoryProcess_finish` 函数`
 
-```
+```c
 static int swFactoryProcess_end(swFactory *factory, int fd)
 {
     swServer *serv = factory->ptr;

@@ -10,7 +10,7 @@
 
 无论是哪种内存池，它的基础数据结构都是 `swMemoryPool`:
 
-```
+```c
 typedef struct _swMemoryPool
 {
 	void *object;
@@ -29,7 +29,7 @@ typedef struct _swMemoryPool
 
 首先看一下 `MemoryGlobal` 的数据结构：
 
-```
+```c
 typedef struct _swMemoryGlobal_page
 {
     struct _swMemoryGlobal_page *next;
@@ -53,7 +53,7 @@ typedef struct _swMemoryGlobal
 
 ### `MemoryGlobal` 的创建
 
-```
+```c
 #define SW_MIN_PAGE_SIZE  4096
 
 swMemoryPool* swMemoryGlobal_new(uint32_t pagesize, uint8_t shared)
@@ -101,7 +101,7 @@ swMemoryPool* swMemoryGlobal_new(uint32_t pagesize, uint8_t shared)
 	|  swMemoryGlobal | swMemoryPool | memory |
 	| --- | --- | --- |
 
-```
+```c
 static swMemoryGlobal_page* swMemoryGlobal_new_page(swMemoryGlobal *gm)
 {
     swMemoryGlobal_page *page = (gm->shared == 1) ? sw_shm_malloc(gm->pagesize) : sw_malloc(gm->pagesize);
@@ -128,7 +128,7 @@ static swMemoryGlobal_page* swMemoryGlobal_new_page(swMemoryGlobal *gm)
 
 ### `MemoryGlobal` 内存的申请
 
-```
+```c
 static void *swMemoryGlobal_alloc(swMemoryPool *pool, uint32_t size)
 {
     swMemoryGlobal *gm = pool->object;
@@ -164,7 +164,7 @@ static void *swMemoryGlobal_alloc(swMemoryPool *pool, uint32_t size)
 
 ### `MemoryGlobal` 内存的释放与销毁
 
-```
+```c
 static void swMemoryGlobal_free(swMemoryPool *pool, void *ptr)
 {
     swWarn("swMemoryGlobal Allocator don't need to release.");
@@ -195,7 +195,7 @@ static void swMemoryGlobal_destroy(swMemoryPool *poll)
 
 `RingBuffer` 类似于一个循环数组，每一次申请的一块内存在该数组中占据一个位置，这些内存块是可以不等长的，因此每个内存块需要有一个记录其长度的变量。
 
-```
+```c
 typedef struct
 {
     uint16_t lock;
@@ -231,7 +231,7 @@ typedef struct
 | --- | --- | --- |
 	
 
-```
+```c
 swMemoryPool *swRingBuffer_new(uint32_t size, uint8_t shared)
 {
     void *mem = (shared == 1) ? sw_shm_malloc(size) : sw_malloc(size);
@@ -273,7 +273,7 @@ swMemoryPool *swRingBuffer_new(uint32_t size, uint8_t shared)
 	- 而且数组当前 `collect_offset` 距离尾部的内存大于申请的内存数，那么剩余的容量就是 `size - alloc_offset`
 	- 数组当前内存位置距离尾部容量不足，那么就将当前内存到数组尾部打包成为一个 `swRingBuffer_item` 数组元素，并标志为待回收元素，设置 `status` 为 1，设置 `alloc_offset` 为数组首地址，此时剩余的容量就是 `collect_offset` 的地址
 
-```
+```c
 static void* swRingBuffer_alloc(swMemoryPool *pool, uint32_t size)
 {
     assert(size > 0);
@@ -341,7 +341,7 @@ static void* swRingBuffer_alloc(swMemoryPool *pool, uint32_t size)
 - 当 `RingBuffer` 的 `free_count` 大于 0 的时候，就说明当前内存池存在需要回收的元素，每次在申请新的内存时，都会调用这个函数来回收内存。
 - 回收内存时，本函数只会回收连续的多个空余的内存元素，若多个待回收的内存元素之间相互隔离，那么这些内存元素不会被回收。
 
-```
+```c
 static void swRingBuffer_collect(swRingBuffer *object)
 {
     swRingBuffer_item *item;
@@ -380,7 +380,7 @@ static void swRingBuffer_collect(swRingBuffer *object)
 
 内存的释放很简单，只需要设置 `lock` 为 0，并且增加 `free_count` 的数量即可：
 
-```
+```c
 static void swRingBuffer_free(swMemoryPool *pool, void *ptr)
 {
     swRingBuffer *object = pool->object;
@@ -409,7 +409,7 @@ static void swRingBuffer_free(swMemoryPool *pool, void *ptr)
 
 ### `RingBuffer` 内存的销毁
 
-```
+```c
 static void swRingBuffer_destory(swMemoryPool *pool)
 {
     swRingBuffer *object = pool->object;
@@ -433,7 +433,7 @@ static void swRingBuffer_destory(swMemoryPool *pool)
 
 `FixedPool` 是随机分配内存池，将一整块内存空间切分成等大小的一个个小块，每次分配其中的一个小块作为要使用的内存，这些小块以双向链表的形式存储。
 
-```
+```c
 typedef struct _swFixedPool_slice
 {
     uint8_t lock;
@@ -479,7 +479,7 @@ typedef struct _swFixedPool
 
 `FixedPool` 内存池的创建有两个函数 `swFixedPool_new` 与 `swFixedPool_new2`，其中 `swFixedPool_new2` 是利用已有的内存基础上来构建内存池，这个也是 `table` 共享内存表创建的方法。
 
-```
+```c
 swMemoryPool* swFixedPool_new2(uint32_t slice_size, void *memory, size_t size)
 {
     swFixedPool *object = memory;
@@ -513,7 +513,7 @@ swMemoryPool* swFixedPool_new2(uint32_t slice_size, void *memory, size_t size)
 
 内存池的创建和前两个大同小异，只是这次多了 `swFixedPool_init` 这个构建双向链表的过程：
 
-```
+```c
 static void swFixedPool_init(swFixedPool *object)
 {
     swFixedPool_slice *slice;
@@ -556,7 +556,7 @@ static void swFixedPool_init(swFixedPool *object)
 
 ### `FixedPool` 内存池的申请
 
-```
+```c
 static void* swFixedPool_alloc(swMemoryPool *pool, uint32_t size)
 {
     swFixedPool *object = pool->object;
@@ -597,7 +597,7 @@ static void* swFixedPool_alloc(swMemoryPool *pool, uint32_t size)
 
 ### `FixedPool` 内存池的释放
 
-```
+```c
 static void swFixedPool_free(swMemoryPool *pool, void *ptr)
 {
     swFixedPool *object = pool->object;
@@ -644,7 +644,7 @@ static void swFixedPool_free(swMemoryPool *pool, void *ptr)
 
 ### `FixedPool` 内存池的销毁
 
-```
+```c
 static void swFixedPool_destroy(swMemoryPool *pool)
 {
     swFixedPool *object = pool->object;

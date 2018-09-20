@@ -11,7 +11,7 @@
 
 ## 共享内存数据结构
 
-```
+```c
 typedef struct _swShareMemory_mmap
 {
     size_t size;
@@ -32,7 +32,7 @@ typedef struct _swShareMemory_mmap
 
 `swoole` 在申请共享内存时常常调用的函数是 `sw_shm_malloc`，这个函数可以为进程匿名申请一大块连续的共享内存：
 
-```
+```c
 void* sw_shm_malloc(size_t size)
 {
     swShareMemory object;
@@ -53,7 +53,7 @@ void* sw_shm_malloc(size_t size)
 
 - 从 `sw_shm_malloc` 函数可以看出，虽然我们申请的是 `size`，但是实际申请的内存是要略大的，因为还要加上 `swShareMemory` 这个结构体。当函数返回时，也不会直接返回申请的内存首地址，而是复制了 `object` 各个成员变量的值后，在申请的首地址上加上 `swShareMemory` 的大小。
 
-```
+```c
 void *swShareMemory_mmap_create(swShareMemory *object, size_t size, char *mapfile)
 {
     void *mem;
@@ -111,7 +111,7 @@ void *swShareMemory_mmap_create(swShareMemory *object, size_t size, char *mapfil
 
 `calloc` 与 `malloc` 大同小异，无非多了一个 `num` 参数
 
-```
+```c
 void* sw_shm_calloc(size_t num, size_t _size)
 {
     swShareMemory object;
@@ -138,7 +138,7 @@ void* sw_shm_calloc(size_t num, size_t _size)
 
 `realloc` 函数用于修改已申请的内存大小，逻辑非常简单，先申请新的内存，进行复制后，再释放旧的内存：
 
-```
+```c
 void* sw_shm_realloc(void *ptr, size_t new_size)
 {
     swShareMemory *object = ptr - sizeof(swShareMemory);
@@ -162,7 +162,7 @@ void* sw_shm_realloc(void *ptr, size_t new_size)
 
 在内存映射完成后，由标记读、写、执行权限的 `PROT_READ`、`PROT_WRITE` 和 `PROT_EXEC` 等权限仍可以被 `mprotect` 系统调用所修改。
 
-```
+```c
 int sw_shm_protect(void *addr, int flags)
 {
     swShareMemory *object = (swShareMemory *) (addr - sizeof(swShareMemory));
@@ -172,7 +172,7 @@ int sw_shm_protect(void *addr, int flags)
 ```
 ## 共享内存的释放
 
-```
+```c
 void sw_shm_free(void *ptr)
 {
     swShareMemory *object = ptr - sizeof(swShareMemory);

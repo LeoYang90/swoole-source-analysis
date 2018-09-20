@@ -9,7 +9,7 @@
 - `swoole_table` 实际上就是一个开链法实现的哈希表，`memory` 是一个由哈希键与具体数据组成的数组，如果哈希冲突(不同的键值对应同一个哈希)，那么就会从 `pool` 中分配出一个元素作为数组元素的链表尾
 - `size` 是创建共享内存表时设置的最大行数；`conflict_proportion` 是哈希冲突的最大比例，超过这个比例，共享内存表就不允许再添加新的行元素；`iterator` 是内存表的迭代器，可以利用它进行内存表数据的浏览；`columns` 是内存表的列元素集合，由于内存表的列元素也是一个 `key-value` 格式，因此也是一个哈希表 `swHashMap` 类型；`mask` 存放的是(最大行数-1)，专门进行哈希值与数组 `index` 的转化；`item_size` 是所有列元素的内存大小总和；
 
-```
+```c
 typedef struct
 {
     uint32_t absolute_index;
@@ -44,7 +44,7 @@ typedef struct
 ```
 - `swTableRow` 是内存表的行元素，其中 `lock` 是行锁；`active` 代表该行是否被启用；`next` 是哈希冲突的链表；`key` 是该行的键值，也就是哈希之前的原始键值;`data` 是真正的行数据，里面会加载各个列元素的值
 
-```
+```c
 typedef struct _swTableRow
 {
 #if SW_TABLE_USE_SPINLOCK
@@ -70,7 +70,7 @@ typedef struct _swTableRow
 ```
 - `swTableColumn` 是内存表的单个列元素，`name` 是列的名字；`type` 是列的数据类型，可选参数为 `swoole_table_type`；`index` 说明当前的列元素在表列中的位置；`size` 是指列的数据类型占用的内存大小
 
-```
+```c
 enum swoole_table_type
 {
     SW_TABLE_INT = 1,
@@ -101,7 +101,7 @@ typedef struct
 - 行数并不是严格按照用户定义的数据而来，如果 `size` 不是为 2 的 `N` 次方，如 `1024`、`8192`,`65536` 等，底层会自动调整为接近的一个数字，如果小于 `1024` 则默认成 `1024`，即 `1024` 是最小值
 - 创建过程中各个成员变量的意义可见上一小节
 
-```
+```c
 swTable* swTable_new(uint32_t rows_size, float conflict_proportion)
 {
     if (rows_size >= 0x80000000)
@@ -165,7 +165,7 @@ swTable* swTable_new(uint32_t rows_size, float conflict_proportion)
 - `swoole_table->column(string $name, int $type, int $size = 0)` 对应下面的函数
 - 列元素创建并初始化成功后，会调用 `swHashMap_add` 函数将列元素添加到 `table->columns` 中
 
-```
+```c
 int swTableColumn_add(swTable *table, char *name, int len, int type, int size)
 {
     swTableColumn *col = sw_malloc(sizeof(swTableColumn));
@@ -234,7 +234,7 @@ int swTableColumn_add(swTable *table, char *name, int len, int type, int size)
 - `table->rows` 创建成功之后，就要对哈希冲突的行元素分配地址空间。可以看到，哈希冲突的行元素首地址为 `memory += row_memory_size * table->size`，并且利用已有的内存构建 `FixedPool` 随机内存池，`row_memory_size` 作为内存池内部元素的大小
 
 
-```
+```c
 int swTable_create(swTable *table)
 {
     size_t memory_size = swTable_get_memory_size(table);
@@ -283,7 +283,7 @@ int swTable_create(swTable *table)
 `(内存表行数+哈希冲突行数)*(行元素大小+各个列元素大小总和)+哈希冲突内存池头部大小+行元素指针大小*内存表行数`
 - 比较难以理解的是最后那个 `行元素大小*内存表行数`，这个其实是在创建 `table->rows[table->size]` 这个指针数组，我们之前说过 `table->rows` 是个二维数组，这个数组里面存放的是多个 `swTableRow*` 类型的数据，例如 `table->rows[0]`等，`table->rows[0]` 等才是存放各个行元素首地址的地方，如果没有这个指针数组，那么每次去取行元素都要计算行元素的首地址，效率没有这么快。
 
-```
+```c
 size_t swTable_get_memory_size(swTable *table)
 {
     /**
@@ -320,7 +320,7 @@ size_t swTable_get_memory_size(swTable *table)
 
 - 共享内存表添加新的元素需要调用三个函数，分别是 `swTableRow_set` 设置行的 `key` 值、`swTableColumn_get` 获取列元素，`swTableRow_set_value` 函数根据列的数据类型为 `row->data` 赋值，流程如下：
 
-```
+```c
 static PHP_METHOD(swoole_table, set)
 {
     zval *array;
@@ -374,7 +374,7 @@ static PHP_METHOD(swoole_table, set)
 - 我们先来看 `swTableRow_set` 函数，从下面的代码来看，这个函数主要的作用就是判断新添加的 `key` 是否造成了哈希冲突，如果没有冲突(`row->active=0`)，那么直接 `table->row_num` 自增，设置 `row->key` 就可以了。
 - 如果发生哈希冲突，那么就要循环当前行元素的链表，直到（1）找到相同的 `key` 值，说明并不是真的发生了哈希冲突，而是用户要修改已有的行数据，那么就直接跳出函数，然后更改 `row->data` 的值；(2) 没有找到相同的 `key` 值，说明的确遇到了哈希冲突，不同的 `key` 值对应了相同的哈希值，此时已经循环到达链表的末尾，需要从内存池中构建出一个  `swTableRow` 行元素，放到链表的尾部
 
-```
+```c
 swTableRow* swTableRow_set(swTable *table, char *key, int keylen, swTableRow **rowlock)
 {
     if (keylen > SW_TABLE_KEY_SIZE)
@@ -453,7 +453,7 @@ swTableRow* swTableRow_set(swTable *table, char *key, int keylen, swTableRow **r
 	- `swoole_hash_austin` 是 `MurmurHash` 哈希算法，广泛应用在 `redis`、`Memcached` 等算法中
 - 哈希计算之后，我们发现哈希值又与 `table->mask` 进行了逻辑与计算，目的是得到一个小于等于 `table->mask`(`rows_size - 1`) 的数字，作为行元素的 `index`
 
-```
+```c
 static sw_inline swTableRow* swTable_hash(swTable *table, char *key, int keylen)
 {
 #ifdef SW_TABLE_USE_PHP_HASH
@@ -471,7 +471,7 @@ static sw_inline swTableRow* swTable_hash(swTable *table, char *key, int keylen)
 	- 若是普通的互斥锁，那么就直接使用 `pthread_mutex_lock` 即可，如果不是互斥锁，程序实现了一个自旋锁
 	- 若是自旋锁，就调用 `swoole` 自定义的自旋锁加锁
 
-```
+```c
 static sw_inline void swTableRow_lock(swTableRow *row)
 {
 #if SW_TABLE_USE_SPINLOCK
@@ -486,7 +486,7 @@ static sw_inline void swTableRow_lock(swTableRow *row)
 
 从多个列元素组成的 `hashMap` 中根据 `column_key` 快速找到对应的列元素
 
-```
+```c
 static sw_inline swTableColumn* swTableColumn_get(swTable *table, char *column_key, int keylen)
 {
     return swHashMap_find(table->columns, column_key, keylen);
@@ -498,7 +498,7 @@ static sw_inline swTableColumn* swTableColumn_get(swTable *table, char *column_k
 
 根据取出的列元素数据的类型，为 `row->data` 对应的位置上赋值，值得注意的是 `default` 实际上指的是 `SW_TABLE_STRING` 类型，这时会先储存字符串长度，再存储字符串值：
 
-```
+```c
 static sw_inline void swTableRow_set_value(swTableRow *row, swTableColumn * col, void *value, int vlen)
 {
     int8_t _i8;
@@ -548,7 +548,7 @@ static sw_inline void swTableRow_set_value(swTableRow *row, swTableColumn * col,
 
 - 根据键值获取行元素需要调用三个函数：`swTableRow_get` 获取行对象元素，如果只取特定字段，那么会调用 `php_swoole_table_get_field_value`，如果需要去全部字段，那么会调用 `php_swoole_table_row2array`：
 
-```
+```c
 static PHP_METHOD(swoole_table, get)
 {
     char *key;
@@ -583,7 +583,7 @@ static PHP_METHOD(swoole_table, get)
 
 利用 `key` 计算出行元素的 `index` 值，遇到存在哈希链表的情况，要不断对比 `key` 的值，直到找到完全相等的键值返回：
 
-```
+```c
 swTableRow* swTableRow_get(swTable *table, char *key, int keylen, swTableRow** rowlock)
 {
     if (keylen > SW_TABLE_KEY_SIZE)
@@ -625,7 +625,7 @@ swTableRow* swTableRow_get(swTable *table, char *key, int keylen, swTableRow** r
 
 首先通过 `swHashMap_find` 函数根据 `field` 确定字段类型，如果是字符串，需要先获取字符串的长度：
 
-```
+```c
 static inline void php_swoole_table_get_field_value(swTable *table, swTableRow *row, zval *return_value, char *field, uint16_t field_len)
 {
     swTable_string_length_t vlen = 0;
@@ -674,7 +674,7 @@ static inline void php_swoole_table_get_field_value(swTable *table, swTableRow *
 
 与上一个函数相比，这个函数仅仅是换成了利用 `swHashMap_each` 遍历列元素，然后利用列元素取值的过程，取值之后，还有利用 `add_assoc_stringl_ex` 等 `zend` 的 `API`, 将值不断转化为 `PHP` 数组：
 
-```
+```c
 #define sw_add_assoc_string                   add_assoc_string
 #define sw_add_assoc_stringl_ex               add_assoc_stringl_ex
 #define sw_add_assoc_stringl                  add_assoc_stringl
@@ -738,7 +738,7 @@ static inline void php_swoole_table_row2array(swTable *table, swTableRow *row, z
 
 ## `swoole_table->incr` 字段值自增
 
-```
+```c
 static PHP_METHOD(swoole_table, incr)
 {
     char *key;
@@ -804,7 +804,7 @@ static PHP_METHOD(swoole_table, incr)
 
 ## `swoole_table->incr` 字段值自减
 
-```
+```c
 static PHP_METHOD(swoole_table, decr)
 {
     char *key;
@@ -880,7 +880,7 @@ static PHP_METHOD(swoole_table, decr)
 	- 如果发现是链表的头元素，那么将链表的第二个元素的数据赋值给头元素，然后从内存池中释放链表的第二个元素，减小共享表行数
 	- 如果是链表的中间元素，那么和普通删除链表节点的方法一致，减小共享表行数
 
-```
+```c
 int swTableRow_del(swTable *table, char *key, int keylen)
 {
     if (keylen > SW_TABLE_KEY_SIZE)
@@ -962,7 +962,7 @@ int swTableRow_del(swTable *table, char *key, int keylen)
 
 `swoole_table` 类实现了迭代器，可以使用 `foreach` 进行遍历。
 
-```
+```c
 void swoole_table_init(int module_number TSRMLS_DC)
 {
     #ifdef HAVE_PCRE
@@ -974,7 +974,7 @@ void swoole_table_init(int module_number TSRMLS_DC)
 
 可以看到，`swoole` 在对 `swoole_table` 进行初始化的时候，为这个类继承了 `spl_iterator` 这个接口，我们知道，对继承了这个接口的类进行 `foreach`，不会触发原始的对象成员变量的遍历，而是会调用 `spl_iterator` 的 `rewind`、`next` 等方法：
 
-```
+```c
 #ifdef HAVE_PCRE
 static PHP_METHOD(swoole_table, rewind);
 static PHP_METHOD(swoole_table, next);
@@ -987,9 +987,11 @@ static PHP_METHOD(swoole_table, valid);
 
 关于为什么要 `PCRE` 这个正则表达式库的依赖，本人非常疑惑，希望有人能够解疑。
 
+新版本 swoole 已经去除 PCRE 依赖！
+
 ### `rewind`
 
-```
+```c
 static PHP_METHOD(swoole_table, rewind)
 {
     swTable *table = swoole_get_object(getThis());
@@ -1013,7 +1015,7 @@ void swTable_iterator_rewind(swTable *table)
 
 - `swTable_iterator_forward` 就是将迭代器向前进行一步，其中 `absolute_index` 类似于共享表的行索引，`collision_index` 类似于共享表的列索引。不同的是，对于没有哈希冲突的行，列索引只有一个 0，对于哈希冲突的行，列索引就是开链法的链表索引：
 
-```
+```c
 static sw_inline swTableRow* swTable_iterator_get(swTable *table, uint32_t index)
 {
     swTableRow *row = table->rows[index];
@@ -1064,7 +1066,7 @@ void swTable_iterator_forward(swTable *table)
 
 `current` 方法很简单，取出当前迭代器的行元素，再转化为 `php` 数组即可
 
-```
+```c
 static PHP_METHOD(swoole_table, current)
 {
     swTable *table = swoole_get_object(getThis());
@@ -1090,7 +1092,7 @@ swTableRow* swTable_iterator_current(swTable *table)
 
 取出当前迭代器的键值：
 
-```
+```c
 static PHP_METHOD(swoole_table, key)
 {
     swTable *table = swoole_get_object(getThis());
@@ -1111,7 +1113,7 @@ static PHP_METHOD(swoole_table, key)
 
 `next` 就是迭代器向前进一步：
 
-```
+```c
 static PHP_METHOD(swoole_table, next)
 {
     swTable *table = swoole_get_object(getThis());
@@ -1128,7 +1130,7 @@ static PHP_METHOD(swoole_table, next)
 
 验证当前行元素是否为空：
 
-```
+```c
 static PHP_METHOD(swoole_table, valid)
 {
     swTable *table = swoole_get_object(getThis());

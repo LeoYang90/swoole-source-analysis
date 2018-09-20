@@ -11,7 +11,7 @@
 
 `channel` 数据结构的属性比较多，`head` 是队列的头部位置，`tail` 是队列的尾部位置，`size` 是申请的队列内存大小，`maxlen` 是每个队列元素的大小，`head_tag` 和 `tail_tag` 用于指定队列的头尾是否循环被重置回头部。`bytes` 是当前 `channel` 队列占用的内存大小，`flag` 用来指定是否使用共享内存、是否使用锁、是否使用 `pipe` 通知。`mem` 是 `channel` 的内存首地址。 
 
-```
+```c
 typedef struct _swChannel_item
 {
     int length;
@@ -48,7 +48,7 @@ typedef struct _swChannel
 
 创建队列就是根据 `flags` 来初始化队列的各个属性，值得注意的是 `maxlen`，当申请内存的时候会多申请这些内存，用来防止内存越界。
 
-```
+```c
 swChannel* swChannel_new(size_t size, int maxlen, int flags)
 {
     assert(size >= maxlen);
@@ -114,7 +114,7 @@ swChannel* swChannel_new(size_t size, int maxlen, int flags)
 
 如果当前 `channel` 尾部未被重置，就可以放心的追加元素，因为 `object->size` 和真正申请的内存之前还有 `maxlen` 可以富余，不必考虑内存越界的问题。
 
-```
+```c
 int swChannel_push(swChannel *object, void *in, int data_length)
 {
     assert(object->flag & SW_CHAN_LOCK);
@@ -169,7 +169,7 @@ int swChannel_in(swChannel *object, void *in, int data_length)
 
 `swChannel_push` 出队的逻辑比较简单，获取队列头部位置，然后拷贝首部数据即可。当 `head` 超过 `size` 值，即可重置 `head`。
 
-```
+```c
 int swChannel_pop(swChannel *object, void *out, int buffer_length)
 {
     assert(object->flag & SW_CHAN_LOCK);

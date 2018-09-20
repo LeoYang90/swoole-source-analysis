@@ -10,7 +10,7 @@
 
 不管哪种类型的管道，其基础都是 `swPipe`，该结构体包含一个具体的 `pipe` 类 `object`，代表着是否阻塞的 `blocking`，超时时间 `timeout`，还有对管道的操作函数`read`、`write`、`getfd`、`close`
 
-```
+```c
 typedef struct _swPipe
 {
     void *object;
@@ -35,7 +35,7 @@ typedef struct _swPipe
 
 因此使用这个匿名管道的时候，一般情形是一个进程只负责写，另一个进程只负责读，只能单向传递消息，不能双向传递，否则很有可能读到了自己刚刚发送的消息。
 
-```
+```c
 typedef struct _swPipeBase
 {
     int pipes[2];
@@ -47,7 +47,7 @@ typedef struct _swPipeBase
 
 创建匿名管道就是调用 `pipe` 函数，程序自动设置管道为非阻塞式。
 
-```
+```c
 int swPipeBase_create(swPipe *p, int blocking)
 {
     int ret;
@@ -85,7 +85,7 @@ int swPipeBase_create(swPipe *p, int blocking)
 
 由于匿名管道被设置为非阻塞式，无法实现超时等待写入。如果想要阻塞式的向管道写入数据，设置一定超时时间，就需要利用 `poll` 函数。当 `pipefd` 可读时，`poll` 立刻返回，或者达到超时时间。
 
-```
+```c
 static int swPipeBase_read(swPipe *p, void *data, int length)
 {
     swPipeBase *object = p->object;
@@ -138,7 +138,7 @@ int swSocket_wait(int fd, int timeout_ms, int events)
 
 管道的写入直接调用 `write` 即可，非阻塞式 `IO` 会立刻返回结果。
 
-```
+```c
 static int swPipeBase_write(swPipe *p, void *data, int length)
 {
     swPipeBase *this = p->object;
@@ -151,7 +151,7 @@ static int swPipeBase_write(swPipe *p, void *data, int length)
 
 本函数用于获取管道的读端或者写端。
 
-```
+```c
 static int swPipeBase_getFd(swPipe *p, int isWriteFd)
 {
     swPipeBase *this = p->object;
@@ -162,7 +162,7 @@ static int swPipeBase_getFd(swPipe *p, int isWriteFd)
 
 ### `swPipeBase_close` 关闭管道
 
-```
+```c
 static int swPipeBase_close(swPipe *p)
 {
     int ret1, ret2;
@@ -185,7 +185,7 @@ static int swPipeBase_close(swPipe *p)
 
 该管道同样也是只适用于进程间单向通信。
 
-```
+```c
 typedef struct _swPipeEventfd
 {
     int event_fd;
@@ -199,7 +199,7 @@ typedef struct _swPipeEventfd
 
 由于 `eventfd` 可能是阻塞式，因此 `read` 时可能会被信号打断。
 
-```
+```c
 static int swPipeEventfd_read(swPipe *p, void *data, int length)
 {
     int ret = -1;
@@ -232,7 +232,7 @@ static int swPipeEventfd_read(swPipe *p, void *data, int length)
 
 写入和读取的过程类似，注意被信号打断后继续循环即可。
 
-```
+```c
 static int swPipeEventfd_write(swPipe *p, void *data, int length)
 {
     int ret;
@@ -257,7 +257,7 @@ static int swPipeEventfd_write(swPipe *p, void *data, int length)
 ### `swPipeEventfd_getFd` 
 
 
-```
+```c
 static int swPipeEventfd_getFd(swPipe *p, int isWriteFd)
 {
     return ((swPipeEventfd *) (p->object))->event_fd;
@@ -268,7 +268,7 @@ static int swPipeEventfd_getFd(swPipe *p, int isWriteFd)
 ### `swPipeEventfd_close` 关闭管道
 
 
-```
+```c
 static int swPipeEventfd_close(swPipe *p)
 {
     int ret;
@@ -287,7 +287,7 @@ static int swPipeEventfd_close(swPipe *p)
 
 因此两个进程利用 `swPipeUnsock` 管道进行通信的时候，独占一个 `sock`，也就是说 `A` 进程读写都是用 `socks[0]`，`B` 进程读写都是用 `socks[1]`，`socks[0]` 写入的消息会在 `socks[1]` 读出来，反之，`socks[0]` 读出的消息是 `sock[1]` 写入的，这样就实现了两个进程的双向通信。
 
-```
+```c
 typedef struct _swPipeUnsock
 {
     /**
@@ -310,7 +310,7 @@ typedef struct _swPipeUnsock
 
 `swPipeUnsock` 的创建主要是调用 `socketpair` 函数，`protocol` 决定了创建的 `socket` 是 `SOCK_DGRAM` 类型还是 `SOCK_STREAM` 类型。
 
-```
+```c
 int swPipeUnsock_create(swPipe *p, int blocking, int protocol)
 {
     int ret;
@@ -371,7 +371,7 @@ int swSocket_set_buffer_size(int fd, int buffer_size)
 
 同样的获取管道文件描述符根据 `master` 来决定。
 
-```
+```c
 static int swPipeUnsock_getFd(swPipe *p, int master)
 {
     swPipeUnsock *this = p->object;
@@ -384,7 +384,7 @@ static int swPipeUnsock_getFd(swPipe *p, int master)
 
 关闭管道就是调用 `close` 来依次关闭两个 `socket`.
 
-```
+```c
 static int swPipeUnsock_close(swPipe *p)
 {
     swPipeUnsock *object = p->object;
@@ -435,7 +435,7 @@ int swPipeUnsock_close_ext(swPipe *p, int which)
 
 这个就是 `pipe` 函数或者 `eventfd` 创建的匿名管道的用途，用于单向的进程通信（`tasker` 进程向 `worker` 进程传递数据）。
 
-```
+```c
 static inline int swPipeNotify_auto(swPipe *p, int blocking, int semaphore)
 {
 #ifdef HAVE_EVENTFD
@@ -451,7 +451,7 @@ static inline int swPipeNotify_auto(swPipe *p, int blocking, int semaphore)
 
 `manager` 负责为 `worker` 进程创建 `pipe_master` 与 `pipe_worker`。用于 `reactor` 线程与 `worker` 进程直接进行通信。
 
-```
+```c
 int swManager_start(swFactory *factory)
 {
    ...
@@ -475,7 +475,7 @@ int swManager_start(swFactory *factory)
 
 当 `reactor` 线程启动的时候，会将 `pipe_master` 加入 `reactor` 的监控当中。
 
-```
+```c
 static int swReactorThread_loop(swThreadParam *param)
 {
 
@@ -506,7 +506,7 @@ static int swReactorThread_loop(swThreadParam *param)
 在 `worker` 进程中，会将 `pipe_worker` 作为另一端 `socket` 放入 `worker` 的 `reactor` 事件循环中进行监控。
 
 
-```
+```c
 int swWorker_loop(swFactory *factory, int worker_id)
 {
     ...
@@ -531,7 +531,7 @@ int swWorker_loop(swFactory *factory, int worker_id)
 
 `tasker` 进程中管道的创建是 `swProcessPool_create` 函数完成的。
 
-```
+```c
 int swProcessPool_create(swProcessPool *pool, int worker_num, int max_request, key_t msgqueue_key, int ipc_mode)
 {
     ...
@@ -565,7 +565,7 @@ int swProcessPool_create(swProcessPool *pool, int worker_num, int max_request, k
 ```
 向 `tasker` 进程发布任务的时候，会调用 `swProcessPool_dispatch` 函数，进而会向 `pipe_master` 管道写入任务数据。
 
-```
+```c
 int swProcessPool_dispatch(swProcessPool *pool, swEventData *data, int *dst_worker_id)
 {
     ...
@@ -608,7 +608,7 @@ int swWorker_send2worker(swWorker *dst_worker, void *buf, int n, int flag)
 
 `tasker` 进程并没有 `reactor` 事件循环，只会阻塞在某个系统调用中，如果 `tasker` 进程采用的是 `unix socket` 进行投递任务的时候，就会阻塞在对管道的 `read` 当中。
 
-```
+```c
 static int swProcessPool_worker_loop(swProcessPool *pool, swWorker *worker)
 {
     ...
