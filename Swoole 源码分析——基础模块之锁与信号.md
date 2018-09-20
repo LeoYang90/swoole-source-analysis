@@ -13,7 +13,7 @@
 - `swoole` 中无论哪种锁，其数据结构都是 `swLock`，这个数据结构内部有一个联合体 `object`，这个联合体可以是 互斥锁、自旋锁、文件锁、读写锁、原子锁，`type` 可以指代这个锁的类型，具体可选项是 `SW_LOCKS` 这个枚举类型
 - 该结构体还定义了几个函数指针，这几个函数类似于各个锁需要实现的接口，值得注意的是 `lock_rd` 和 `trylock_rd`两个函数是专门为了 `swFileLock` 和 `swRWLock` 设计的，其他锁没有这两个函数。
 
-```
+```c
 typedef struct _swLock
 {
 	int type;
@@ -61,7 +61,7 @@ enum SW_LOCKS
 
 互斥锁是最常用的进程/线程锁，`swMutex` 的基础是 `pthread_mutex` 系列函数, 因此该数据结构只有两个成员变量：`_lock`、`attr`：
 
-```
+```c
 typedef struct _swMutex
 {
     pthread_mutex_t _lock;
@@ -73,7 +73,7 @@ typedef struct _swMutex
 
 互斥锁的创建就是 `pthread_mutex` 互斥锁的初始化，首先初始化互斥锁的属性 `pthread_mutexattr_t attr`，设定互斥锁是否要进程共享，之后设置各个关于锁的函数：
 
-```
+```c
 int swMutex_create(swLock *lock, int use_in_process)
 {
     int ret;
@@ -101,7 +101,7 @@ int swMutex_create(swLock *lock, int use_in_process)
 
 互斥锁的函数就是调用相应的 `pthread_mutex` 系列函数：
 
-```
+```c
 static int swMutex_lock(swLock *lock)
 {
     return pthread_mutex_lock(&lock->object.mutex._lock);
@@ -137,7 +137,7 @@ int swMutex_lockwait(swLock *lock, int timeout_msec)
 
 对于读多写少的情况，读写锁可以显著的提高程序效率，`swRWLock` 的基础是 `pthread_rwlock` 系列函数：
 
-```
+```c
 typedef struct _swRWLock
 {
     pthread_rwlock_t _lock;
@@ -151,7 +151,7 @@ typedef struct _swRWLock
 
 读写锁的创建过程和互斥锁类似：
 
-```
+```c
 int swRWLock_create(swLock *lock, int use_in_process)
 {
     int ret;
@@ -178,7 +178,7 @@ int swRWLock_create(swLock *lock, int use_in_process)
 ```
 ### 读写锁函数
 
-```
+```c
 
 static int swRWLock_lock_rd(swLock *lock)
 {
@@ -216,7 +216,7 @@ static int swRWLock_free(swLock *lock)
 
 文件锁是对多进程、多线程同一时间写相同文件这一场景设定的锁，底层函数是 `fcntl`：
 
-```
+```c
 typedef struct _swFileLock
 {
     struct flock lock_t;
@@ -227,7 +227,7 @@ typedef struct _swFileLock
 
 ### 文件锁的创建
 
-```
+```c
 int swFileLock_create(swLock *lock, int fd)
 {
     bzero(lock, sizeof(swLock));
@@ -246,7 +246,7 @@ int swFileLock_create(swLock *lock, int fd)
 
 ### 文件锁函数
 
-```
+```c
 static int swFileLock_lock_rd(swLock *lock)
 {
     lock->object.filelock.lock_t.l_type = F_RDLCK;
@@ -289,7 +289,7 @@ static int swFileLock_free(swLock *lock)
 自旋锁类似于互斥锁，不同的是自旋锁在加锁失败的时候，并不会沉入内核，而是空转，这样的锁效率更高，但是会空耗 CPU
  资源：
 
-```
+```c
 typedef struct _swSpinLock
 {
     pthread_spinlock_t lock_t;
@@ -299,7 +299,7 @@ typedef struct _swSpinLock
 
 ### 自旋锁的创建
 
-```
+```c
 int swSpinLock_create(swLock *lock, int use_in_process)
 {
     int ret;
@@ -320,7 +320,7 @@ int swSpinLock_create(swLock *lock, int use_in_process)
 
 ### 自旋锁函数
 
-```
+```c
 static int swSpinLock_lock(swLock *lock)
 {
     return pthread_spin_lock(&lock->object.spinlock.lock_t);
@@ -347,7 +347,7 @@ static int swSpinLock_free(swLock *lock)
 
 不同于以上几种锁，`swoole` 的原子锁并不是 `pthread` 系列的锁，而是自定义实现的。
 
-```
+```c
 typedef volatile uint32_t                 sw_atomic_uint32_t;
 typedef sw_atomic_uint32_t                sw_atomic_t;
 
@@ -361,7 +361,7 @@ typedef struct _swAtomicLock
 
 ### 原子锁的创建
 
-```
+```c
 int swAtomicLock_create(swLock *lock, int spin)
 {
     bzero(lock, sizeof(swLock));
@@ -377,7 +377,7 @@ int swAtomicLock_create(swLock *lock, int spin)
 
 ### 原子锁的加锁
 
-```
+```c
 static int swAtomicLock_lock(swLock *lock)
 {
     sw_spinlock(&lock->object.atomlock.lock_t);
@@ -394,7 +394,7 @@ static int swAtomicLock_lock(swLock *lock)
 - 间隔时间内执行的函数 `sw_atomic_cpu_pause` 使用的是内嵌的汇编代码，目的在让 `cpu` 空转，禁止线程或进程被其他线程强占导致睡眠，恢复上下文浪费时间。
 - 如果超过了 `SW_SPINLOCK_LOOP_N` 次数，还没有能够获取的到锁，那么也要让出控制权，这时很有可能被锁保护的代码有阻塞行为
 
-```
+```c
 #define sw_atomic_cmp_set(lock, old, set) __sync_bool_compare_and_swap(lock, old, set)
 #define sw_atomic_cpu_pause()             __asm__ __volatile__ ("pause")
 #define swYield()              sched_yield() //or usleep(1)
@@ -431,7 +431,7 @@ static sw_inline void sw_spinlock(sw_atomic_t *lock)
 
 ### 原子锁的函数
 
-```
+```c
 static int swAtomicLock_unlock(swLock *lock)
 {
     return lock->object.atomlock.lock_t = 0;
@@ -449,7 +449,7 @@ static int swAtomicLock_trylock(swLock *lock)
 
 信号量也是数据同步的一种重要方式，其数据结构为：
 
-```
+```c
 typedef struct _swSem
 {
     key_t key;
@@ -463,7 +463,7 @@ typedef struct _swSem
 - 信号量的初始化首先需要调用 `semget` 创建一个新的信号量
 - `semctl` 会将信号量初始化为 0
 
-```
+```c
 int swSem_create(swLock *lock, key_t key)
 {
     int ret;
@@ -491,7 +491,7 @@ int swSem_create(swLock *lock, key_t key)
 
 ### 信号量的 V 操作
 
-```
+```c
 static int swSem_unlock(swLock *lock)
 {
     struct sembuf sem;
@@ -505,7 +505,7 @@ static int swSem_unlock(swLock *lock)
 
 ### 信号量的 P 操作
 
-```
+```c
 static int swSem_lock(swLock *lock)
 {
     struct sembuf sem;
@@ -521,7 +521,7 @@ static int swSem_lock(swLock *lock)
 
 - `IPC_RMID` 用于销毁信号量
 
-```
+```c
 static int swSem_free(swLock *lock)
 {
     return semctl(lock->object.sem.semid, 0, IPC_RMID);
@@ -534,7 +534,7 @@ static int swSem_free(swLock *lock)
 - 条件变量并没有作为 `swLock` 的一员，而是自成一体
 - 条件变量不仅需要 `pthread_cond_t`，还需要互斥量 `swLock`
 
-```
+```c
 typedef struct _swCond
 {
     swLock _lock;
@@ -553,7 +553,7 @@ typedef struct _swCond
 
 ### 条件变量的创建
 
-```
+```c
 int swCond_create(swCond *cond)
 {
     if (pthread_cond_init(&cond->_cond, NULL) < 0)
@@ -583,7 +583,7 @@ int swCond_create(swCond *cond)
 
 - 值得注意的是，条件变量的函数使用一定要结合 `swCond_lock`、`swCond_unlock` 等函数
 
-```
+```c
 static int swCond_notify(swCond *cond)
 {
     return pthread_cond_signal(&cond->_cond);
