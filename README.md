@@ -26,3 +26,4 @@
 - [Swoole 源码分析——Server模块之OpenSSL(上)](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94Server%E6%A8%A1%E5%9D%97%E4%B9%8BOpenSSL(%E4%B8%8A).md)
 - [Swoole 源码分析——Server模块之OpenSSL(下)](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94Server%E6%A8%A1%E5%9D%97%E4%B9%8BOpenSSL(%E4%B8%8B).md)
 - [Swoole 源码分析——Async 异步事件系统 Swoole_Event](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94Async%20%E5%BC%82%E6%AD%A5%E4%BA%8B%E4%BB%B6%E7%B3%BB%E7%BB%9Fswoole_event.md)
+- [Swoole 源码分析——进程管理 Swoole_Process](https://github.com/LeoYang90/swoole-source-analysis/blob/master/Swoole%20%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E8%BF%9B%E7%A8%8B%E7%B3%BB%E7%BB%9F%20Swoole_Process.md)
